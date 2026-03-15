@@ -101,7 +101,7 @@ function RevenueTooltip({ active, payload, label }: any) {
       <p className="mb-1 text-sm font-medium text-slate-900">{label}</p>
       {payload.map((entry: any) => (
         <p key={entry.name} className="text-sm" style={{ color: entry.color }}>
-          {entry.name}: {formatCurrency(entry.value)}
+          {entry.name}: {formatCurrency(entry.value, "EUR")}
         </p>
       ))}
     </div>
@@ -114,7 +114,7 @@ function PieTooltip({ active, payload }: any) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-xl">
       <p className="text-sm font-medium text-slate-900">{data.name}</p>
-      <p className="text-sm text-slate-600">{formatCurrency(data.value)}</p>
+      <p className="text-sm text-slate-600">{formatCurrency(data.value, "EUR")}</p>
     </div>
   )
 }
@@ -153,6 +153,14 @@ export default function DashboardPage() {
   const expenseCategories = getExpenseCategories()
 
   const hasData = invoices.length > 0
+
+  // Detect primary currency from invoices
+  const currencyCounts = invoices.reduce((acc: Record<string, number>, inv) => {
+    acc[inv.currency] = (acc[inv.currency] || 0) + 1
+    return acc
+  }, {})
+  const primaryCurrency = Object.entries(currencyCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "EUR"
+  const fc = (amount: number) => formatCurrency(amount, primaryCurrency)
 
   // ─── Computed Data ───────────────────────────────────────
 
@@ -352,11 +360,11 @@ export default function DashboardPage() {
             <div className="mt-4">
               <p className="text-sm font-medium text-slate-500">Total Invoiced</p>
               <p className="mt-1 text-2xl font-bold text-slate-900">
-                {formatCurrency(totalRevenue)}
+                {fc(totalRevenue)}
               </p>
               {revenueByMonth.length >= 2 && (
                 <p className="mt-1 text-xs text-slate-400">
-                  vs {formatCurrency(previousMonthRevenue)} last month
+                  vs {fc(previousMonthRevenue)} last month
                 </p>
               )}
             </div>
@@ -378,7 +386,7 @@ export default function DashboardPage() {
             <div className="mt-4">
               <p className="text-sm font-medium text-slate-500">Outstanding Receivables</p>
               <p className="mt-1 text-2xl font-bold text-amber-600">
-                {formatCurrency(stats.totalUnpaid)}
+                {fc(stats.totalUnpaid)}
               </p>
               <p className="mt-1 text-xs text-slate-400">
                 Across {unpaidCount + stats.overdueCount} invoices
@@ -403,7 +411,7 @@ export default function DashboardPage() {
                 {stats.paidCount} / {stats.invoiceCount}
               </p>
               <p className="mt-1 text-xs text-slate-400">
-                {formatCurrency(stats.totalPaid)} collected
+                {fc(stats.totalPaid)} collected
               </p>
             </div>
           </CardContent>
@@ -424,7 +432,7 @@ export default function DashboardPage() {
             <div className="mt-4">
               <p className="text-sm font-medium text-slate-500">Overdue Amount</p>
               <p className="mt-1 text-2xl font-bold text-red-600">
-                {formatCurrency(stats.totalOverdue)}
+                {fc(stats.totalOverdue)}
               </p>
               <p className="mt-1 text-xs text-slate-400">
                 {stats.overdueRatio.toFixed(0)}% of total invoiced
@@ -449,7 +457,7 @@ export default function DashboardPage() {
                 <CardDescription className="mt-1">Monthly revenue, expenses & profit</CardDescription>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold text-slate-900">{formatCurrency(stats.netIncome)}</p>
+                <p className="text-2xl font-bold text-slate-900">{fc(stats.netIncome)}</p>
                 <p className="text-xs text-slate-500">Net income</p>
               </div>
             </div>
@@ -568,7 +576,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-slate-400">{entry.count}</span>
-                        <span className="font-medium text-slate-900">{formatCurrency(entry.value)}</span>
+                        <span className="font-medium text-slate-900">{fc(entry.value)}</span>
                       </div>
                     </div>
                   ))}
@@ -638,7 +646,7 @@ export default function DashboardPage() {
               Expense Breakdown
             </CardTitle>
             <CardDescription>
-              Total expenses: {formatCurrency(totalExpenses)}
+              Total expenses: {fc(totalExpenses)}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -679,7 +687,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-slate-400">{pct}%</span>
-                          <span className="font-medium text-slate-900">{formatCurrency(entry.value)}</span>
+                          <span className="font-medium text-slate-900">{fc(entry.value)}</span>
                         </div>
                       </div>
                     )
@@ -734,18 +742,18 @@ export default function DashboardPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-semibold text-slate-900">
-                        {formatCurrency(client.revenue)}
+                        {fc(client.revenue)}
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge variant="secondary">{client.invoiceCount}</Badge>
                       </TableCell>
                       <TableCell className="text-right text-emerald-600">
-                        {formatCurrency(client.paidAmount)}
+                        {fc(client.paidAmount)}
                       </TableCell>
                       <TableCell className="text-right">
                         {client.overdueAmount > 0 ? (
                           <span className="font-medium text-red-600">
-                            {formatCurrency(client.overdueAmount)}
+                            {fc(client.overdueAmount)}
                           </span>
                         ) : (
                           <span className="text-slate-400">--</span>
@@ -813,7 +821,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-emerald-600">
-                          +{formatCurrency(payment.amount)}
+                          +{fc(payment.amount)}
                         </p>
                         <p className="text-xs text-slate-400">{formatDate(payment.date)}</p>
                       </div>
@@ -879,7 +887,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-slate-900">
-                          {formatCurrency(inv.total)}
+                          {fc(inv.total)}
                         </p>
                         <div className="flex items-center justify-end gap-1.5">
                           <span className="text-xs text-slate-400">
@@ -921,7 +929,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-xs font-medium text-slate-400">Avg Invoice</p>
                 <p className="text-lg font-bold text-slate-900">
-                  {formatCurrency(stats.averageInvoiceValue)}
+                  {fc(stats.averageInvoiceValue)}
                 </p>
               </div>
             </div>
@@ -965,7 +973,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-xs font-medium text-slate-400">Net Income</p>
                 <p className="text-lg font-bold text-slate-900">
-                  {formatCurrency(stats.netIncome)}
+                  {fc(stats.netIncome)}
                 </p>
               </div>
             </div>

@@ -221,7 +221,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                     </TableCell>
                     <TableCell>{formatDate(inv.issueDate)}</TableCell>
                     <TableCell>{formatDate(inv.dueDate)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
+                    <TableCell className="font-medium">{formatCurrency(inv.total, inv.currency)}</TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(inv.status)}>{getStatusLabel(inv.status)}</Badge>
                     </TableCell>

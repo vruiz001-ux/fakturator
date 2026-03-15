@@ -192,10 +192,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                       <TableCell className="text-slate-500">
                         {UNITS.find(u => u.value === item.unit)?.short || item.unit}
                       </TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(item.unitPrice, invoice.currency)}</TableCell>
                       <TableCell className="text-right text-slate-500">{item.vatRate}%</TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.netAmount)}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(item.grossAmount)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(item.netAmount, invoice.currency)}</TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(item.grossAmount, invoice.currency)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -205,26 +205,26 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               <div className="mt-6 ml-auto w-72 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Subtotal (Net)</span>
-                  <span className="font-medium">{formatCurrency(invoice.subtotal)}</span>
+                  <span className="font-medium">{formatCurrency(invoice.subtotal, invoice.currency)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">VAT</span>
-                  <span className="font-medium">{formatCurrency(invoice.vatTotal)}</span>
+                  <span className="font-medium">{formatCurrency(invoice.vatTotal, invoice.currency)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
                   <span className="text-base font-semibold text-slate-900">Total (Gross)</span>
-                  <span className="text-xl font-bold text-indigo-600">{formatCurrency(invoice.total)}</span>
+                  <span className="text-xl font-bold text-indigo-600">{formatCurrency(invoice.total, invoice.currency)}</span>
                 </div>
                 {invoice.paidAmount > 0 && invoice.paidAmount < invoice.total && (
                   <>
                     <div className="flex justify-between text-sm">
                       <span className="text-emerald-600">Paid</span>
-                      <span className="font-medium text-emerald-600">{formatCurrency(invoice.paidAmount)}</span>
+                      <span className="font-medium text-emerald-600">{formatCurrency(invoice.paidAmount, invoice.currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-red-600">Remaining</span>
-                      <span className="font-medium text-red-600">{formatCurrency(invoice.total - invoice.paidAmount)}</span>
+                      <span className="font-medium text-red-600">{formatCurrency(invoice.total - invoice.paidAmount, invoice.currency)}</span>
                     </div>
                   </>
                 )}
@@ -285,15 +285,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <CardContent className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Total</span>
-                <span className="font-semibold">{formatCurrency(invoice.total)}</span>
+                <span className="font-semibold">{formatCurrency(invoice.total, invoice.currency)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Paid</span>
-                <span className="font-semibold text-emerald-600">{formatCurrency(invoice.paidAmount)}</span>
+                <span className="font-semibold text-emerald-600">{formatCurrency(invoice.paidAmount, invoice.currency)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Outstanding</span>
-                <span className="font-semibold text-amber-600">{formatCurrency(invoice.total - invoice.paidAmount)}</span>
+                <span className="font-semibold text-amber-600">{formatCurrency(invoice.total - invoice.paidAmount, invoice.currency)}</span>
               </div>
 
               {/* Progress bar */}
@@ -371,7 +371,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     <div className="mt-1 h-2 w-2 rounded-full bg-emerald-400" />
                     <div>
                       <p className="text-sm text-slate-700">Payment received</p>
-                      <p className="text-xs text-slate-400">{formatCurrency(invoice.paidAmount)}</p>
+                      <p className="text-xs text-slate-400">{formatCurrency(invoice.paidAmount, invoice.currency)}</p>
                     </div>
                   </div>
                 )}
