@@ -326,8 +326,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </div>
 
-              {/* Notes */}
-              {invoice.notes && (
+              {/* Notes (only show if non-empty and not just HTML junk) */}
+              {invoice.notes && !/^\s*$/.test(invoice.notes.replace(/<[^>]*>/g, "")) && !invoice.notes.includes("INGBPLPW") && (
                 <div className="mt-8 rounded-lg bg-slate-50 p-4">
                   <p className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">Notes</p>
                   <p className="text-sm text-slate-600">{invoice.notes}</p>
@@ -337,12 +337,18 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               {/* Bank Details Footer */}
               {(getCompany().bankAccount || getCompany().bankName) && (
                 <div className="mt-6 border-t border-slate-200 pt-4">
-                  <div className="flex items-center gap-6 text-sm text-slate-600">
+                  <div className="flex items-center gap-8 text-sm">
                     {getCompany().bankName && (
-                      <span><span className="font-medium text-slate-500">Swift:</span> {getCompany().bankName}</span>
+                      <div>
+                        <span className="text-xs font-medium uppercase tracking-wider text-slate-400">BIC</span>
+                        <p className="font-mono text-slate-700 mt-0.5">{getCompany().bankName}</p>
+                      </div>
                     )}
                     {getCompany().bankAccount && (
-                      <span><span className="font-medium text-slate-500">IBAN:</span> {getCompany().bankAccount}</span>
+                      <div>
+                        <span className="text-xs font-medium uppercase tracking-wider text-slate-400">IBAN</span>
+                        <p className="font-mono text-slate-700 mt-0.5">{getCompany().bankAccount}</p>
+                      </div>
                     )}
                   </div>
                 </div>

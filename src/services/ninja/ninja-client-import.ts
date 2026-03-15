@@ -3,6 +3,26 @@ import type { NinjaClient, NinjaInvoice, NinjaProduct, NinjaPayment, NinjaImport
 import { addClient, addInvoice, addService, updateInvoiceStatus, initializeStore, setCompany } from "@/lib/store/data-store"
 import { logAudit } from "@/lib/audit/audit.service"
 
+// Strip HTML and remove bank details from Ninja public_notes
+// Bank details (BIC/IBAN) are extracted separately into company profile
+function cleanNinjaNotes(html: string | undefined): string {
+  if (!html) return ""
+  // Strip all HTML tags
+  let text = html.replace(/<[^>]*>/g, " ")
+  // Decode HTML entities
+  text = text.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+  // Remove bank-related lines (already stored in company profile)
+  text = text.replace(/ING Bank.*$/mi, "")
+  text = text.replace(/Swift\s*:.*$/mi, "")
+  text = text.replace(/IBAN\s*:.*$/mi, "")
+  text = text.replace(/BIC\s*:.*$/mi, "")
+  text = text.replace(/PL\d{2}\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}/g, "")
+  text = text.replace(/INGBPLPW/g, "")
+  // Clean up whitespace
+  text = text.replace(/\s+/g, " ").trim()
+  return text
+}
+
 const NINJA_STATUS: Record<string, string> = {
   "1": "DRAFT", "2": "SENT", "3": "PARTIALLY_PAID",
   "4": "PAID", "5": "CANCELLED", "6": "CANCELLED",
@@ -177,7 +197,7 @@ export function importNinjaDataToStore(data: {
         dueDate,
         paymentMethod: "BANK_TRANSFER",
         currency: NINJA_CURRENCY[data.companyCurrencyId || ""] || "EUR",
-        notes: inv.public_notes || undefined,
+        notes: cleanNinjaNotes(inv.public_notes) || undefined,
         items,
       })
 
