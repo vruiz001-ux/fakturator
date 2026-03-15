@@ -200,7 +200,7 @@ export default function KsefPage() {
                   </TableCell>
                   <TableCell className="font-medium">{inv.invoiceNumber}</TableCell>
                   <TableCell className="text-slate-600">{inv.client?.name}</TableCell>
-                  <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
+                  <TableCell className="font-medium">{formatCurrency(inv.total, inv.currency)}</TableCell>
                   <TableCell className="text-slate-500">{formatDate(inv.issueDate)}</TableCell>
                   <TableCell>
                     <Badge variant="success" className="text-xs">Valid</Badge>

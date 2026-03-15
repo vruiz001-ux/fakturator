@@ -326,7 +326,7 @@ export default function ExpensesPage() {
                       <TableCell className="font-medium">
                         {expense.isForeignCurrency
                           ? `${expense.grossAmount.toFixed(2)} ${expense.currency}`
-                          : formatCurrency(expense.grossAmount)}
+                          : formatCurrency(expense.grossAmount, expense.currency)}
                       </TableCell>
                       {tab === "fx" && (
                         <>
@@ -349,7 +349,7 @@ export default function ExpensesPage() {
                         </>
                       )}
                       {tab !== "fx" && (
-                        <TableCell className="font-semibold">{formatCurrency(expense.grossAmount)}</TableCell>
+                        <TableCell className="font-semibold">{formatCurrency(expense.grossAmount, expense.currency)}</TableCell>
                       )}
                       <TableCell>
                         {expense.isRebilled ? (

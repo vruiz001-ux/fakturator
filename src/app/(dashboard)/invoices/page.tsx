@@ -434,7 +434,7 @@ export default function InvoicesPage() {
                       </TableCell>
                       <TableCell className="py-3.5 text-right">
                         <span className="text-sm font-medium text-slate-900 tabular-nums">
-                          {formatCurrency(invoice.total)}
+                          {formatCurrency(invoice.total, invoice.currency)}
                         </span>
                       </TableCell>
                       <TableCell className="py-3.5">

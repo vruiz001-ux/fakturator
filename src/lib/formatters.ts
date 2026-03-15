@@ -1,7 +1,7 @@
 import { format, formatDistanceToNow } from "date-fns"
 import { INVOICE_STATUSES, CURRENCIES } from "./constants"
 
-export function formatCurrency(amount: number, currency = "PLN"): string {
+export function formatCurrency(amount: number, currency = "EUR"): string {
   const curr = CURRENCIES.find((c) => c.value === currency)
   return new Intl.NumberFormat("pl-PL", {
     style: "currency",
