@@ -161,8 +161,10 @@ export default function DashboardPage() {
 
   // Currency display with live FX conversion
   const displayCurrency = getDisplayCurrency()
-  const [fxRates, setFxRates] = useState<Record<string, number>>({ EUR: 1 })
-  const [fxSource, setFxSource] = useState<string>("")
+  const [fxRates, setFxRates] = useState<Record<string, number>>({
+    EUR: 1, PLN: 4.2675, USD: 1.1476, GBP: 0.86503, CHF: 0.9034,
+  })
+  const [fxSource, setFxSource] = useState<string>("LOADING")
   const [fxDate, setFxDate] = useState<string>("")
 
   // Fetch live FX rates from ECB via our API
@@ -170,24 +172,32 @@ export default function DashboardPage() {
     fetch("/api/fx")
       .then((r) => r.json())
       .then((data) => {
-        if (data.rates) {
+        if (data.rates && Object.keys(data.rates).length > 1) {
           setFxRates(data.rates)
-          setFxSource(data.source || "")
+          setFxSource(data.source || "ECB")
           setFxDate(data.date || "")
         }
       })
-      .catch(() => {})
+      .catch(() => { setFxSource("FALLBACK") })
   }, [])
 
-  // Convert amount from source currency to display currency using live rates
+  // Convert amount from source currency to display currency using live ECB rates
+  // ECB rates are EUR-based: rates[X] = how many X per 1 EUR
+  // To convert A units of FROM to TO: A * (rates[TO] / rates[FROM])
   const convert = (amount: number, fromCurrency?: string) => {
     const from = fromCurrency || "EUR"
     if (from === displayCurrency) return amount
-    const fromRate = fxRates[from] || 1
-    const toRate = fxRates[displayCurrency] || 1
+    const fromRate = fxRates[from]
+    const toRate = fxRates[displayCurrency]
+    if (!fromRate || !toRate) return amount // Can't convert — show original
     const rate = toRate / fromRate
     return Math.round(amount * rate * 100) / 100
   }
+
+  // Current conversion rate for display
+  const currentFxRate = displayCurrency !== "EUR"
+    ? (fxRates[displayCurrency] || 0) / (fxRates["EUR"] || 1)
+    : 1
 
   const fc = (amount: number, fromCurrency?: string) =>
     formatCurrency(convert(amount, fromCurrency), displayCurrency)
@@ -371,10 +381,13 @@ export default function DashboardPage() {
           <p className="mt-1 text-sm text-slate-500">Financial overview</p>
         </div>
         <div className="flex items-center gap-3">
-          {fxSource && fxDate && displayCurrency !== "EUR" && (
-            <span className="text-[10px] text-slate-400 hidden sm:block">
-              {fxSource === "ECB" ? "ECB" : "Fallback"} rates · {fxDate}
-            </span>
+          {displayCurrency !== "EUR" && (
+            <div className="text-right hidden sm:block">
+              <p className="text-xs font-mono text-slate-600">1 EUR = {currentFxRate.toFixed(4)} {displayCurrency}</p>
+              <p className="text-[10px] text-slate-400">
+                {fxSource === "ECB" ? "ECB" : fxSource === "LOADING" ? "Loading..." : "Fallback"}{fxDate ? ` · ${fxDate}` : ""}
+              </p>
+            </div>
           )}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-400">Display</span>
