@@ -60,6 +60,54 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState("")
   const [actionLoading, setActionLoading] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
+
+  const handleDownloadPDF = async () => {
+    if (!invoice) return
+    setPdfLoading(true)
+    try {
+      const company = getCompany()
+      const res = await fetch("/api/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoice: {
+            invoiceNumber: invoice.invoiceNumber,
+            status: invoice.status,
+            issueDate: invoice.issueDate?.split("T")[0] || "",
+            saleDate: invoice.saleDate?.split("T")[0],
+            dueDate: invoice.dueDate?.split("T")[0] || "",
+            paymentMethod: invoice.paymentMethod,
+            currency: invoice.currency,
+            subtotal: invoice.subtotal,
+            vatTotal: invoice.vatTotal,
+            total: invoice.total,
+            paidAmount: invoice.paidAmount,
+            notes: invoice.notes,
+            items: invoice.items,
+            client: invoice.client,
+          },
+          company,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        alert(err.error || "PDF generation failed")
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${invoice.invoiceNumber.replace(/\//g, "-")}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      alert(err.message || "PDF download failed")
+    } finally {
+      setPdfLoading(false)
+    }
+  }
 
   const handleStatusChange = (newStatus: string) => {
     if (!invoice) return
@@ -152,6 +200,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           </p>
         </div>
         <div className="flex gap-2">
+          {/* PDF Download */}
+          <Button variant="outline" size="sm" onClick={handleDownloadPDF} loading={pdfLoading}>
+            <Download className="h-4 w-4" />
+            PDF
+          </Button>
           {/* Status actions */}
           {invoice.status === "DRAFT" && (
             <>

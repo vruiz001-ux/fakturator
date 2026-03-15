@@ -23,6 +23,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="company" className="space-y-6">
         <TabsList>
           <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="subscription">Subscription</TabsTrigger>
           <TabsTrigger value="tax">Tax & VAT</TabsTrigger>
           <TabsTrigger value="invoicing">Invoicing</TabsTrigger>
           <TabsTrigger value="delivery">Email Delivery</TabsTrigger>
@@ -99,6 +100,71 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Subscription */}
+        <TabsContent value="subscription">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Free Plan */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Free Plan</CardTitle>
+                <CardDescription>For getting started</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-3xl font-bold text-slate-900">€0<span className="text-sm font-normal text-slate-500">/month</span></p>
+                <ul className="space-y-2 text-sm text-slate-600">
+                  <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> 5 invoices per month</li>
+                  <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> 3 clients</li>
+                  <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> Basic dashboard</li>
+                  <li className="flex items-center gap-2 text-slate-400"><span>✗</span> PDF export</li>
+                  <li className="flex items-center gap-2 text-slate-400"><span>✗</span> Email delivery</li>
+                  <li className="flex items-center gap-2 text-slate-400"><span>✗</span> Ninja import</li>
+                </ul>
+                <Button variant="outline" className="w-full" disabled>Current Plan</Button>
+              </CardContent>
+            </Card>
+
+            {/* Pro Plan */}
+            <Card className="border-indigo-200 bg-indigo-50/30 relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-indigo-600 text-white text-xs px-3 py-1 rounded-bl-lg font-medium">Recommended</div>
+              <CardHeader>
+                <CardTitle className="text-indigo-700">Pro Plan</CardTitle>
+                <CardDescription>For serious businesses</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-3xl font-bold text-indigo-700">€10<span className="text-sm font-normal text-indigo-500">/month</span></p>
+                <ul className="space-y-2 text-sm text-slate-700">
+                  <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> Unlimited invoices</li>
+                  <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> Unlimited clients</li>
+                  <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> Full analytics + FX conversion</li>
+                  <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> PDF export</li>
+                  <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> Email delivery</li>
+                  <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> Ninja Invoice import</li>
+                  <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> KSeF compliance</li>
+                  <li className="flex items-center gap-2"><span className="text-emerald-500">✓</span> AI Assistant</li>
+                </ul>
+                <Button
+                  className="w-full"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/stripe/checkout", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email: "user@fakturator.pl" }),
+                      })
+                      const data = await res.json()
+                      if (data.url) window.location.href = data.url
+                      else alert(data.error || "Failed to start checkout")
+                    } catch { alert("Checkout unavailable — configure Stripe to enable") }
+                  }}
+                >
+                  Upgrade to Pro — €10/month
+                </Button>
+                <p className="text-xs text-center text-slate-400">Cancel anytime. Powered by Stripe.</p>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Tax Settings */}
