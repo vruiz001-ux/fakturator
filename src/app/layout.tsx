@@ -62,6 +62,11 @@ export default function RootLayout({
         className={`${inter.variable} font-sans antialiased`}
         suppressHydrationWarning
       >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var k="fakturator_onboarding";var d=localStorage.getItem(k);if(d){JSON.parse(d)}}catch(e){localStorage.removeItem(k)}`,
+          }}
+        />
         {children}
       </body>
     </html>

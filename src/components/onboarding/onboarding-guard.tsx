@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
-
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/onboarding"]
+import { loadOnboarding, isOnboardingComplete } from "@/lib/onboarding/onboarding.store"
 
 export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -11,19 +10,23 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    let shouldRedirect = false
     try {
-      const { loadOnboarding, isOnboardingComplete } = require("@/lib/onboarding/onboarding.store")
-      loadOnboarding()
-
-      const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith("/onboarding"))
-      if (!isPublic && !isOnboardingComplete()) {
-        router.replace("/onboarding")
-        return
+      if (typeof window !== "undefined") {
+        loadOnboarding()
+        if (!isOnboardingComplete()) {
+          shouldRedirect = true
+        }
       }
     } catch {
-      // If onboarding store fails, allow access
+      // Never block the app on onboarding errors
     }
-    setReady(true)
+
+    if (shouldRedirect) {
+      router.replace("/onboarding")
+    } else {
+      setReady(true)
+    }
   }, [pathname, router])
 
   if (!ready) {

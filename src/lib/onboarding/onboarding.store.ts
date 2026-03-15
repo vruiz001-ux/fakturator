@@ -85,10 +85,31 @@ export function loadOnboarding(): void {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
-      const parsed = JSON.parse(stored) as OnboardingState
-      state = { ...state, ...parsed, data: { ...createDefaultData(), ...parsed.data } }
+      const parsed = JSON.parse(stored)
+      if (parsed && typeof parsed === "object" && parsed.data) {
+        const defaults = createDefaultData()
+        state = {
+          status: parsed.status || "NOT_STARTED",
+          currentStep: typeof parsed.currentStep === "number" ? parsed.currentStep : 0,
+          completedSteps: Array.isArray(parsed.completedSteps) ? parsed.completedSteps : [],
+          completedAt: parsed.completedAt,
+          data: {
+            company: { ...defaults.company, ...(parsed.data.company || {}) },
+            billing: { ...defaults.billing, ...(parsed.data.billing || {}) },
+            banking: { ...defaults.banking, ...(parsed.data.banking || {}) },
+            invoicing: { ...defaults.invoicing, ...(parsed.data.invoicing || {}) },
+            services: { ...defaults.services, ...(parsed.data.services || {}) },
+            clients: { ...defaults.clients, ...(parsed.data.clients || {}) },
+            expenses: { ...defaults.expenses, ...(parsed.data.expenses || {}) },
+            compliance: { ...defaults.compliance, ...(parsed.data.compliance || {}) },
+          },
+        }
+      }
     }
-  } catch {}
+  } catch {
+    // Corrupted localStorage — reset
+    try { localStorage.removeItem(STORAGE_KEY) } catch {}
+  }
   notify()
 }
 
