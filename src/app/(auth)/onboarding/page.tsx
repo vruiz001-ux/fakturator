@@ -51,6 +51,7 @@ export default function OnboardingPage() {
   const [, forceUpdate] = useState(0)
   const [errors, setErrors] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(false)
+  const [sourceMetadata, setSourceMetadata] = useState<any>(null)
 
   useEffect(() => {
     loadOnboarding()
@@ -127,6 +128,10 @@ export default function OnboardingPage() {
             data={data.company}
             onUpdate={(d) => updateStepData("company", d)}
             errors={errors}
+            billingData={data.billing}
+            onUpdateBilling={(d) => updateStepData("billing", d)}
+            sourceMetadata={sourceMetadata}
+            onSourceMetadataChange={setSourceMetadata}
           />
         )
       case 2:
