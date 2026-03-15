@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { testConnection } from "@/services/ninja/ninja.service"
-import { importFromNinja } from "@/services/ninja/ninja-import.service"
-import { initializeStore } from "@/lib/store/data-store"
+import { testConnection, fetchClients, fetchInvoices, fetchProducts, fetchPayments } from "@/services/ninja/ninja.service"
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,14 +17,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result)
     }
 
-    if (action === "import") {
-      initializeStore()
-      const result = await importFromNinja(config, options)
-      return NextResponse.json({ success: true, result })
+    if (action === "fetch") {
+      // Fetch raw data from Ninja — client will do the mapping and store insertion
+      const opts = {
+        importClients: true,
+        importInvoices: true,
+        importProducts: true,
+        importPayments: true,
+        ...options,
+      }
+
+      const [clients, invoices, products, payments] = await Promise.all([
+        opts.importClients ? fetchClients(config) : Promise.resolve([]),
+        opts.importInvoices ? fetchInvoices(config) : Promise.resolve([]),
+        opts.importProducts ? fetchProducts(config) : Promise.resolve([]),
+        opts.importPayments ? fetchPayments(config) : Promise.resolve([]),
+      ])
+
+      return NextResponse.json({
+        success: true,
+        data: { clients, invoices, products, payments },
+      })
     }
 
-    return NextResponse.json({ error: "Unknown action" }, { status: 400 })
+    return NextResponse.json({ error: "Unknown action. Use 'test' or 'fetch'." }, { status: 400 })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Import failed" }, { status: 500 })
+    return NextResponse.json({ error: err.message || "Failed" }, { status: 500 })
   }
 }

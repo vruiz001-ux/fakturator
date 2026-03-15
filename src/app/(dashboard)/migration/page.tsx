@@ -88,11 +88,12 @@ export default function MigrationPage() {
     setImportError("")
 
     try {
+      // Step 1: Fetch raw data from Ninja via server-side proxy
       const res = await fetch("/api/ninja", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "import",
+          action: "fetch",
           apiUrl,
           apiToken,
           options: {
@@ -103,25 +104,35 @@ export default function MigrationPage() {
           },
         }),
       })
-      const data = await res.json()
-      if (data.success && data.result) {
-        setImportResult(data.result)
+      const fetchResult = await res.json()
+      if (!fetchResult.success || !fetchResult.data) {
+        setImportError(fetchResult.error || "Failed to fetch data from Invoice Ninja")
+        setImporting(false)
+        return
+      }
+
+      // Step 2: Import into client-side data store
+      const { importNinjaDataToStore } = await import("@/services/ninja/ninja-client-import")
+      const importResult = importNinjaDataToStore(fetchResult.data)
+
+      if (importResult) {
+        setImportResult(importResult)
         // Add to history
         const totalImported =
-          data.result.clients.imported +
-          data.result.invoices.imported +
-          data.result.products.imported +
-          data.result.payments.imported
+          importResult.clients.imported +
+          importResult.invoices.imported +
+          importResult.products.imported +
+          importResult.payments.imported
         const totalErrors =
-          data.result.clients.errors.length +
-          data.result.invoices.errors.length +
-          data.result.products.errors.length +
-          data.result.payments.errors.length
+          importResult.clients.errors.length +
+          importResult.invoices.errors.length +
+          importResult.products.errors.length +
+          importResult.payments.errors.length
         const totalRecords =
-          data.result.clients.total +
-          data.result.invoices.total +
-          data.result.products.total +
-          data.result.payments.total
+          importResult.clients.total +
+          importResult.invoices.total +
+          importResult.products.total +
+          importResult.payments.total
         setHistory((prev) => [
           {
             id: Date.now(),
@@ -135,7 +146,7 @@ export default function MigrationPage() {
           ...prev,
         ])
       } else {
-        setImportError(data.error || "Import failed")
+        setImportError("Import returned no results")
       }
     } catch (err: any) {
       setImportError(err.message || "Network error")
