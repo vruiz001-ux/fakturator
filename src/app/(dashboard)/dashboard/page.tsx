@@ -57,6 +57,7 @@ import {
   getExpenseCategories,
   getDisplayCurrency,
   setDisplayCurrency,
+  fixInvoiceCurrencies,
   initializeStore,
   isInitialized,
   subscribe,
@@ -142,20 +143,8 @@ export default function DashboardPage() {
     if (!isInitialized()) {
       initializeStore()
     }
-    // One-time migration: fix invoices that were imported with wrong currency
-    const invoices = getInvoices()
-    let fixed = false
-    for (const inv of invoices) {
-      if (!inv.currency || inv.currency === "PLN") {
-        (inv as any).currency = "EUR"
-        fixed = true
-      }
-    }
-    if (fixed) {
-      // Trigger persist by updating display currency
-      const curr = getDisplayCurrency()
-      setDisplayCurrency(curr)
-    }
+    // Fix any invoices with wrong currency — all Ninja imports are EUR
+    fixInvoiceCurrencies("EUR")
   }, [])
 
   const [, forceUpdate] = useState(0)

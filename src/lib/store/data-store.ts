@@ -106,6 +106,23 @@ function loadFromStorage(): boolean {
   return false
 }
 
+// ─── Data Migration ───────────────────────────────────────
+
+export function fixInvoiceCurrencies(correctCurrency: string = "EUR"): number {
+  let fixed = 0
+  for (const inv of store.invoices) {
+    if (inv.currency !== correctCurrency) {
+      inv.currency = correctCurrency as any
+      fixed++
+    }
+  }
+  if (fixed > 0) {
+    persist()
+    notify()
+  }
+  return fixed
+}
+
 // ─── Listeners ────────────────────────────────────────────
 
 type Listener = () => void
