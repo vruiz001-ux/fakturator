@@ -185,36 +185,27 @@ export default function DashboardPage() {
       .catch(() => { setFxSource("FALLBACK") })
   }, [])
 
-  // Convert amount from source currency to display currency using live ECB rates
-  // ECB rates are EUR-based: rates[X] = how many X per 1 EUR
-  // To convert A units of FROM to TO: A * (rates[TO] / rates[FROM])
-  const convert = (amount: number, fromCurrency?: string) => {
-    const from = fromCurrency || "EUR"
-    if (from === displayCurrency) return amount
-    const fromRate = fxRates[from]
-    const toRate = fxRates[displayCurrency]
-    if (!fromRate || !toRate) return amount // Can't convert — show original
-    const rate = toRate / fromRate
-    return Math.round(amount * rate * 100) / 100
+  // Convert EUR amount to display currency using live rates
+  // ALL amounts are treated as EUR (source of truth from Ninja)
+  const fxRate = displayCurrency === "EUR" ? 1 : (fxRates[displayCurrency] || 1)
+
+  const convert = (amount: number) => {
+    if (displayCurrency === "EUR") return amount
+    return Math.round(amount * fxRate * 100) / 100
   }
 
-  // Current conversion rate for display
-  const currentFxRate = displayCurrency !== "EUR"
-    ? (fxRates[displayCurrency] || 0) / (fxRates["EUR"] || 1)
-    : 1
-
-  const fc = (amount: number, fromCurrency?: string) =>
-    formatCurrency(convert(amount, fromCurrency), displayCurrency)
+  const fc = (amount: number) =>
+    formatCurrency(convert(amount), displayCurrency)
 
   // ─── Converted Stats ─────────────────────────────────────
 
   // Recompute stats with FX conversion
-  const totalRevenue = invoices.reduce((s, i) => s + convert(i.subtotal, i.currency), 0)
-  const totalInvoiced = invoices.reduce((s, i) => s + convert(i.total, i.currency), 0)
-  const totalPaid = invoices.filter(i => i.status === "PAID").reduce((s, i) => s + convert(i.total, i.currency), 0)
-  const totalUnpaid = invoices.filter(i => ["SENT", "DRAFT", "PARTIALLY_PAID"].includes(i.status)).reduce((s, i) => s + convert(i.total - i.paidAmount, i.currency), 0)
-  const totalOverdue = invoices.filter(i => i.status === "OVERDUE").reduce((s, i) => s + convert(i.total - i.paidAmount, i.currency), 0)
-  const totalExpenses = expenses.reduce((s, e) => s + convert(e.grossAmount, e.currency), 0)
+  const totalRevenue = invoices.reduce((s, i) => s + convert(i.subtotal), 0)
+  const totalInvoiced = invoices.reduce((s, i) => s + convert(i.total), 0)
+  const totalPaid = invoices.filter(i => i.status === "PAID").reduce((s, i) => s + convert(i.total), 0)
+  const totalUnpaid = invoices.filter(i => ["SENT", "DRAFT", "PARTIALLY_PAID"].includes(i.status)).reduce((s, i) => s + convert(i.total - i.paidAmount), 0)
+  const totalOverdue = invoices.filter(i => i.status === "OVERDUE").reduce((s, i) => s + convert(i.total - i.paidAmount), 0)
+  const totalExpenses = expenses.reduce((s, e) => s + convert(e.grossAmount), 0)
   const netIncome = totalPaid - totalExpenses
   const avgInvoiceValue = invoices.length > 0 ? totalInvoiced / invoices.length : 0
 
@@ -225,14 +216,14 @@ export default function DashboardPage() {
     invoices.reduce((acc: Record<string, { revenue: number; expenses: number }>, inv) => {
       const key = new Date(inv.issueDate).toLocaleString("en", { month: "short", year: "numeric" })
       if (!acc[key]) acc[key] = { revenue: 0, expenses: 0 }
-      acc[key].revenue += convert(inv.subtotal, inv.currency)
+      acc[key].revenue += convert(inv.subtotal)
       return acc
     }, {})
   ).map(([month, data]) => {
     expenses.forEach((exp) => {
       const expKey = new Date(exp.date).toLocaleString("en", { month: "short", year: "numeric" })
       if (expKey === month) {
-        data.expenses += convert(exp.grossAmount, exp.currency)
+        data.expenses += convert(exp.grossAmount)
       }
     })
     return { month, ...data, profit: data.revenue - data.expenses }
@@ -243,7 +234,7 @@ export default function DashboardPage() {
     invoices.reduce((acc: Record<string, { count: number; total: number }>, inv) => {
       if (!acc[inv.status]) acc[inv.status] = { count: 0, total: 0 }
       acc[inv.status].count++
-      acc[inv.status].total += convert(inv.total, inv.currency)
+      acc[inv.status].total += convert(inv.total)
       return acc
     }, {})
   ).map(([status, data]) => ({ status, ...data }))
@@ -261,7 +252,7 @@ export default function DashboardPage() {
       inv.items.forEach((item) => {
         const name = item.service?.name || item.description || "Other"
         if (!acc[name]) acc[name] = { revenue: 0, count: 0 }
-        acc[name].revenue += convert(item.netAmount, inv.currency)
+        acc[name].revenue += convert(item.netAmount)
         acc[name].count++
       })
       return acc
@@ -282,7 +273,7 @@ export default function DashboardPage() {
       const cat = expenseCategories.find((c) => c.id === catId)
       const name = cat?.name || exp.category?.name || "Uncategorized"
       if (!acc[name]) acc[name] = { total: 0, count: 0, categoryId: catId }
-      acc[name].total += convert(exp.grossAmount, exp.currency)
+      acc[name].total += convert(exp.grossAmount)
       acc[name].count++
       return acc
     }, {})
@@ -302,10 +293,10 @@ export default function DashboardPage() {
         const cid = inv.clientId
         const cname = inv.client?.name || clients.find((c) => c.id === cid)?.name || "Unknown"
         if (!acc[cid]) acc[cid] = { clientId: cid, clientName: cname, revenue: 0, invoiceCount: 0, paidAmount: 0, overdueAmount: 0 }
-        acc[cid].revenue += convert(inv.total, inv.currency)
+        acc[cid].revenue += convert(inv.total)
         acc[cid].invoiceCount++
-        if (inv.status === "PAID") acc[cid].paidAmount += convert(inv.total, inv.currency)
-        if (inv.status === "OVERDUE") acc[cid].overdueAmount += convert(inv.total - inv.paidAmount, inv.currency)
+        if (inv.status === "PAID") acc[cid].paidAmount += convert(inv.total)
+        if (inv.status === "OVERDUE") acc[cid].overdueAmount += convert(inv.total - inv.paidAmount)
         return acc
       },
       {}
@@ -335,8 +326,8 @@ export default function DashboardPage() {
   const unpaidCount = invoices.filter((i) => ["SENT", "DRAFT", "PARTIALLY_PAID"].includes(i.status)).length
 
   // VAT summary (converted)
-  const outputVat = invoices.reduce((s, i) => s + convert(i.vatTotal, i.currency), 0)
-  const inputVat = expenses.reduce((s, e) => s + convert(e.vatAmount, e.currency), 0)
+  const outputVat = invoices.reduce((s, i) => s + convert(i.vatTotal), 0)
+  const inputVat = expenses.reduce((s, e) => s + convert(e.vatAmount), 0)
   const vatDue = outputVat - inputVat
 
   // ─── Empty State ────────────────────────────────────────
@@ -387,7 +378,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           {displayCurrency !== "EUR" && (
             <div className="text-right hidden sm:block">
-              <p className="text-xs font-mono text-slate-600">1 EUR = {currentFxRate.toFixed(4)} {displayCurrency}</p>
+              <p className="text-xs font-mono text-slate-600">1 EUR = {fxRate.toFixed(4)} {displayCurrency}</p>
               <p className="text-[10px] text-slate-400">
                 {fxSource === "ECB" ? "ECB" : fxSource === "LOADING" ? "Loading..." : "Fallback"}{fxDate ? ` · ${fxDate}` : ""}
               </p>
