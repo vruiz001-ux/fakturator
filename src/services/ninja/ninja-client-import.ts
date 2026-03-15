@@ -1,6 +1,6 @@
 // Client-side import: maps Ninja data and inserts into browser data store
 import type { NinjaClient, NinjaInvoice, NinjaProduct, NinjaPayment, NinjaImportResult } from "./ninja.types"
-import { addClient, addInvoice, addService, updateInvoiceStatus, initializeStore, setCompany } from "@/lib/store/data-store"
+import { addClient, addInvoice, addService, updateInvoiceStatus, initializeStore, setCompany, clearAllData } from "@/lib/store/data-store"
 import { logAudit } from "@/lib/audit/audit.service"
 
 // Strip HTML and remove bank details from Ninja public_notes
@@ -59,6 +59,8 @@ export function importNinjaDataToStore(data: {
     website: string
   }
 }): NinjaImportResult {
+  // Always clear existing data to prevent duplicates
+  clearAllData()
   initializeStore()
 
   // Set full company profile from Ninja
