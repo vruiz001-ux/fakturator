@@ -369,6 +369,14 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* Debug info — remove after fixing */}
+      <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3 text-xs font-mono text-yellow-800">
+        <p>DEBUG: {invoices.length} invoices | displayCurrency={displayCurrency} | fxRate={fxRate.toFixed(4)}</p>
+        <p>Raw total (no conversion): {invoices.reduce((s,i) => s + i.total, 0).toFixed(2)} | Converted: {totalInvoiced.toFixed(2)}</p>
+        <p>Currencies in data: {[...new Set(invoices.map(i => i.currency || "NONE"))].join(", ")}</p>
+        <p>First invoice: {invoices[0]?.invoiceNumber} | {invoices[0]?.total} | currency={invoices[0]?.currency}</p>
+      </div>
+
       {/* ── Page Header ───────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
