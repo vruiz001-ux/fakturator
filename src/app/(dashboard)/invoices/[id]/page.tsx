@@ -117,9 +117,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <div>
                   <h3 className="text-xl font-bold text-indigo-600">{getCompany().name || "Fakturator"}</h3>
                   <p className="text-sm text-slate-500 mt-1">
-                    ul. Nowy Świat 35<br />
-                    00-029 Warszawa<br />
-                    NIP: 527-298-76-54
+                    {getCompany().address && <>{getCompany().address}<br /></>}
+                    {(getCompany().postalCode || getCompany().city) && <>{getCompany().postalCode} {getCompany().city}<br /></>}
+                    {getCompany().nip && <>NIP: {getCompany().nip}</>}
                   </p>
                 </div>
                 <div className="text-right">

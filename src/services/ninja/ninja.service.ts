@@ -34,7 +34,21 @@ async function fetchAll<T>(config: NinjaConfig, endpoint: string): Promise<T[]> 
   return all
 }
 
-export async function testConnection(config: NinjaConfig): Promise<{ success: boolean; error?: string; companyName?: string }> {
+export interface NinjaCompanyProfile {
+  name: string
+  address1: string
+  address2: string
+  city: string
+  state: string
+  postalCode: string
+  countryId: string
+  vatNumber: string
+  phone: string
+  email: string
+  website: string
+}
+
+export async function testConnection(config: NinjaConfig): Promise<{ success: boolean; error?: string; companyName?: string; companyProfile?: NinjaCompanyProfile }> {
   try {
     const res = await fetch(`${config.apiUrl}/api/v1/companies`, {
       headers: HEADERS(config.apiToken),
@@ -44,8 +58,25 @@ export async function testConnection(config: NinjaConfig): Promise<{ success: bo
       return { success: false, error: res.status === 401 ? "Invalid API token" : `API error: ${res.status}` }
     }
     const data = await res.json()
-    const name = data?.data?.[0]?.settings?.name || "Connected"
-    return { success: true, companyName: name }
+    const settings = data?.data?.[0]?.settings || {}
+    const name = settings.name || "Connected"
+    return {
+      success: true,
+      companyName: name,
+      companyProfile: {
+        name,
+        address1: settings.address1 || "",
+        address2: settings.address2 || "",
+        city: settings.city || "",
+        state: settings.state || "",
+        postalCode: settings.postal_code || "",
+        countryId: settings.country_id || "",
+        vatNumber: settings.vat_number || "",
+        phone: settings.phone || "",
+        email: settings.email || "",
+        website: settings.website || "",
+      },
+    }
   } catch (err: any) {
     return { success: false, error: err.message }
   }

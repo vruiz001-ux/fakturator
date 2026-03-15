@@ -14,11 +14,38 @@ export function importNinjaDataToStore(data: {
   products: NinjaProduct[]
   payments: NinjaPayment[]
   companyName?: string
+  companyProfile?: {
+    name: string
+    address1: string
+    address2: string
+    city: string
+    state: string
+    postalCode: string
+    countryId: string
+    vatNumber: string
+    phone: string
+    email: string
+    website: string
+  }
 }): NinjaImportResult {
   initializeStore()
 
-  // Set company profile from Ninja
-  if (data.companyName) {
+  // Set full company profile from Ninja
+  if (data.companyProfile) {
+    const p = data.companyProfile
+    const address = [p.address1, p.address2].filter(Boolean).join(", ")
+    const nip = p.vatNumber?.replace(/^PL/i, "") || ""
+    setCompany({
+      name: p.name,
+      address,
+      city: p.city,
+      postalCode: p.postalCode,
+      country: "PL",
+      nip,
+      email: p.email,
+      phone: p.phone,
+    })
+  } else if (data.companyName) {
     setCompany({ name: data.companyName })
   }
 
