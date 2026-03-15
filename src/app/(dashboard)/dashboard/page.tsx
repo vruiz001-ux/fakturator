@@ -55,10 +55,15 @@ import {
   getClients,
   getStats,
   getExpenseCategories,
+  getDisplayCurrency,
+  setDisplayCurrency,
   initializeStore,
   isInitialized,
   subscribe,
 } from "@/lib/store/data-store"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
 
 import {
   formatCurrency,
@@ -154,13 +159,9 @@ export default function DashboardPage() {
 
   const hasData = invoices.length > 0
 
-  // Detect primary currency from invoices
-  const currencyCounts = invoices.reduce((acc: Record<string, number>, inv) => {
-    acc[inv.currency] = (acc[inv.currency] || 0) + 1
-    return acc
-  }, {})
-  const primaryCurrency = Object.entries(currencyCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "EUR"
-  const fc = (amount: number) => formatCurrency(amount, primaryCurrency)
+  // Currency display
+  const displayCurrency = getDisplayCurrency()
+  const fc = (amount: number) => formatCurrency(amount, displayCurrency)
 
   // ─── Computed Data ───────────────────────────────────────
 
@@ -327,11 +328,25 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* ── Page Header ───────────────────────────────────── */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Financial overview
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
+          <p className="mt-1 text-sm text-slate-500">Financial overview</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400">Currency</span>
+          <Select value={displayCurrency} onValueChange={(v) => setDisplayCurrency(v)}>
+            <SelectTrigger className="w-24 h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="EUR">EUR</SelectItem>
+              <SelectItem value="PLN">PLN</SelectItem>
+              <SelectItem value="USD">USD</SelectItem>
+              <SelectItem value="GBP">GBP</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* ── KPI Cards Row ─────────────────────────────────── */}

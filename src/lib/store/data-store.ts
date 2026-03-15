@@ -22,8 +22,19 @@ interface CompanyProfile {
   bankAccount?: string
 }
 
+interface NinjaCredentials {
+  apiUrl: string
+  apiToken: string
+}
+
+interface UserSettings {
+  displayCurrency: string
+  ninjaCredentials?: NinjaCredentials
+}
+
 interface DataStore {
   company: CompanyProfile
+  settings: UserSettings
   clients: Client[]
   invoices: Invoice[]
   services: Service[]
@@ -33,8 +44,11 @@ interface DataStore {
   initialized: boolean
 }
 
+const STORAGE_KEY = "fakturator_data"
+
 const store: DataStore = {
   company: { name: "" },
+  settings: { displayCurrency: "EUR" },
   clients: [],
   invoices: [],
   services: [],
@@ -42,6 +56,50 @@ const store: DataStore = {
   expenseCategories: [],
   payments: [],
   initialized: false,
+}
+
+// ─── Persistence ──────────────────────────────────────────
+
+function persist() {
+  if (typeof window === "undefined") return
+  try {
+    const toSave = {
+      company: store.company,
+      settings: store.settings,
+      clients: store.clients,
+      invoices: store.invoices,
+      services: store.services,
+      expenses: store.expenses,
+      expenseCategories: store.expenseCategories,
+      payments: store.payments,
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
+  } catch {}
+}
+
+function loadFromStorage(): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return false
+    const data = JSON.parse(raw)
+    if (data && typeof data === "object") {
+      if (data.company) store.company = { ...store.company, ...data.company }
+      if (data.settings) store.settings = { ...store.settings, ...data.settings }
+      if (Array.isArray(data.clients)) store.clients = data.clients
+      if (Array.isArray(data.invoices)) store.invoices = data.invoices
+      if (Array.isArray(data.services)) store.services = data.services
+      if (Array.isArray(data.expenses)) store.expenses = data.expenses
+      if (Array.isArray(data.expenseCategories) && data.expenseCategories.length > 0) {
+        store.expenseCategories = data.expenseCategories
+      }
+      if (Array.isArray(data.payments)) store.payments = data.payments
+      return true
+    }
+  } catch {
+    try { localStorage.removeItem(STORAGE_KEY) } catch {}
+  }
+  return false
 }
 
 // ─── Listeners ────────────────────────────────────────────
@@ -56,6 +114,7 @@ export function subscribe(listener: Listener): () => void {
 
 function notify() {
   listeners.forEach(l => l())
+  persist()
 }
 
 // ─── Getters ──────────────────────────────────────────────
@@ -63,6 +122,21 @@ function notify() {
 export function getCompany(): CompanyProfile { return store.company }
 export function setCompany(data: Partial<CompanyProfile>): void {
   store.company = { ...store.company, ...data }
+  notify()
+}
+export function getSettings(): UserSettings { return store.settings }
+export function setSettings(data: Partial<UserSettings>): void {
+  store.settings = { ...store.settings, ...data }
+  notify()
+}
+export function getDisplayCurrency(): string { return store.settings.displayCurrency || "EUR" }
+export function setDisplayCurrency(currency: string): void {
+  store.settings.displayCurrency = currency
+  notify()
+}
+export function getNinjaCredentials(): NinjaCredentials | undefined { return store.settings.ninjaCredentials }
+export function setNinjaCredentials(creds: NinjaCredentials): void {
+  store.settings.ninjaCredentials = creds
   notify()
 }
 export function getClients(): Client[] { return store.clients }
@@ -320,17 +394,39 @@ export function recordPayment(invoiceId: string, amount: number, method?: string
 export function initializeStore(): void {
   if (store.initialized) return
 
-  // Set up default expense categories (these are system defaults, not demo data)
-  store.expenseCategories = [
-    { id: 'ec_software', organizationId: 'org1', name: 'Software & Tools', color: '#6366f1', isDefault: true },
-    { id: 'ec_office', organizationId: 'org1', name: 'Office Supplies', color: '#f59e0b', isDefault: true },
-    { id: 'ec_marketing', organizationId: 'org1', name: 'Marketing', color: '#10b981', isDefault: true },
-    { id: 'ec_travel', organizationId: 'org1', name: 'Travel', color: '#3b82f6', isDefault: true },
-    { id: 'ec_professional', organizationId: 'org1', name: 'Professional Services', color: '#8b5cf6', isDefault: true },
-    { id: 'ec_rent', organizationId: 'org1', name: 'Rent & Utilities', color: '#ef4444', isDefault: true },
-  ]
+  // Load persisted data from localStorage
+  const loaded = loadFromStorage()
+
+  // Set up default expense categories if none loaded
+  if (store.expenseCategories.length === 0) {
+    store.expenseCategories = [
+      { id: 'ec_software', organizationId: 'org1', name: 'Software & Tools', color: '#6366f1', isDefault: true },
+      { id: 'ec_office', organizationId: 'org1', name: 'Office Supplies', color: '#f59e0b', isDefault: true },
+      { id: 'ec_marketing', organizationId: 'org1', name: 'Marketing', color: '#10b981', isDefault: true },
+      { id: 'ec_travel', organizationId: 'org1', name: 'Travel', color: '#3b82f6', isDefault: true },
+      { id: 'ec_professional', organizationId: 'org1', name: 'Professional Services', color: '#8b5cf6', isDefault: true },
+      { id: 'ec_rent', organizationId: 'org1', name: 'Rent & Utilities', color: '#ef4444', isDefault: true },
+    ]
+  }
 
   store.initialized = true
+  if (!loaded) persist() // Save defaults
+  notify()
+}
+
+export function clearAllData(): void {
+  store.company = { name: "" }
+  store.settings = { displayCurrency: "EUR" }
+  store.clients = []
+  store.invoices = []
+  store.services = []
+  store.expenses = []
+  store.payments = []
+  store.expenseCategories = []
+  store.initialized = false
+  if (typeof window !== "undefined") {
+    try { localStorage.removeItem(STORAGE_KEY) } catch {}
+  }
   notify()
 }
 

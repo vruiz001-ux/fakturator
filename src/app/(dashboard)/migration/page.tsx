@@ -31,13 +31,26 @@ interface ImportHistoryEntry {
 }
 
 export default function MigrationPage() {
-  // Connection state
+  // Load saved credentials on mount
   const [apiUrl, setApiUrl] = useState("")
   const [apiToken, setApiToken] = useState("")
   const [testing, setTesting] = useState(false)
   const [connected, setConnected] = useState(false)
   const [companyName, setCompanyName] = useState("")
   const [connectionError, setConnectionError] = useState("")
+  const [credentialsLoaded, setCredentialsLoaded] = useState(false)
+
+  // Load saved Ninja credentials from store
+  useState(() => {
+    try {
+      const { getNinjaCredentials, initializeStore } = require("@/lib/store/data-store")
+      initializeStore()
+      const creds = getNinjaCredentials()
+      if (creds?.apiUrl) setApiUrl(creds.apiUrl)
+      if (creds?.apiToken) setApiToken(creds.apiToken)
+      if (creds?.apiUrl && creds?.apiToken) setCredentialsLoaded(true)
+    } catch {}
+  })
 
   // Import options
   const [importClients, setImportClients] = useState(true)
@@ -71,6 +84,11 @@ export default function MigrationPage() {
       const data = await res.json()
       if (data.success) {
         setConnected(true)
+        // Save credentials for future sessions
+        try {
+          const { setNinjaCredentials } = require("@/lib/store/data-store")
+          setNinjaCredentials({ apiUrl, apiToken })
+        } catch {}
         setCompanyName(data.companyName || "Connected")
       } else {
         setConnectionError(data.error || "Connection failed")
