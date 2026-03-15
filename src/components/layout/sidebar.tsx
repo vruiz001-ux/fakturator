@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useState, useEffect } from "react"
 import {
   LayoutDashboard,
   FileText,
@@ -19,6 +20,7 @@ import {
   ArrowLeftRight,
   Plug,
 } from "lucide-react"
+import { getOnboardingState, loadOnboarding, subscribe as onboardingSubscribe } from "@/lib/onboarding/onboarding.store"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -40,6 +42,17 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
+  const [, forceUpdate] = useState(0)
+
+  useEffect(() => {
+    loadOnboarding()
+    return onboardingSubscribe(() => forceUpdate((n) => n + 1))
+  }, [])
+
+  const onboardingState = getOnboardingState()
+  const companyName = onboardingState.status === "COMPLETED"
+    ? onboardingState.data.company.legalName || onboardingState.data.company.tradingName
+    : ""
 
   return (
     <aside
@@ -48,15 +61,22 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         collapsed ? "w-[72px]" : "w-64"
       )}
     >
-      {/* Logo */}
+      {/* Logo + Company Name */}
       <div className="flex h-16 items-center gap-3 border-b border-slate-800 px-4">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600">
           <Zap className="h-5 w-5 text-white" />
         </div>
         {!collapsed && (
-          <span className="text-lg font-bold text-white tracking-tight">
-            Fakturator
-          </span>
+          <div className="min-w-0">
+            {companyName ? (
+              <>
+                <p className="text-sm font-bold text-white truncate leading-tight">{companyName}</p>
+                <p className="text-[10px] text-slate-500 leading-tight">Powered by Fakturator</p>
+              </>
+            ) : (
+              <span className="text-lg font-bold text-white tracking-tight">Fakturator</span>
+            )}
+          </div>
         )}
       </div>
 
