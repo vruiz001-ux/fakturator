@@ -174,40 +174,7 @@ export default function IntegrationsPage() {
 
           <div className="space-y-4 py-2">
             {selectedIntegration?.id === "expensify" && (
-              <>
-                <div className="space-y-2">
-                  <Label>Expensify Partner User ID</Label>
-                  <Input placeholder="your@email.com" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Expensify Partner User Secret</Label>
-                  <Input type="password" placeholder="Enter your API secret" />
-                </div>
-                <Separator />
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">Auto-import expenses</p>
-                      <p className="text-xs text-slate-500">Sync expenses every hour</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">Auto-assign to clients</p>
-                      <p className="text-xs text-slate-500">Match expenses by project tag</p>
-                    </div>
-                    <Switch />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">Mark as billable by default</p>
-                      <p className="text-xs text-slate-500">New imported expenses are billable</p>
-                    </div>
-                    <Switch defaultChecked />
-                  </div>
-                </div>
-              </>
+              <ExpensifyConnect onDone={() => setConfigDialog(null)} />
             )}
 
             {selectedIntegration?.id === "ninja_invoice" && (
@@ -264,6 +231,132 @@ export default function IntegrationsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+// ─── Expensify Connect Component ─────────────────────────
+
+function ExpensifyConnect({ onDone }: { onDone: () => void }) {
+  const [userId, setUserId] = useState("")
+  const [secret, setSecret] = useState("")
+  const [testing, setTesting] = useState(false)
+  const [connected, setConnected] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [error, setError] = useState("")
+  const [result, setResult] = useState<any>(null)
+
+  const handleTest = async () => {
+    setTesting(true)
+    setError("")
+    try {
+      const res = await fetch("/api/expensify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "test", partnerUserID: userId, partnerUserSecret: secret }),
+      })
+      const data = await res.json()
+      if (data.success) setConnected(true)
+      else setError(data.error || "Connection failed")
+    } catch { setError("Network error") }
+    setTesting(false)
+  }
+
+  const handleImport = async () => {
+    setImporting(true)
+    setError("")
+    try {
+      const res = await fetch("/api/expensify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "fetch", partnerUserID: userId, partnerUserSecret: secret }),
+      })
+      const data = await res.json()
+      if (data.success && data.reports) {
+        const { importExpensifyToStore } = await import("@/services/expensify/expensify-import")
+        const importResult = importExpensifyToStore(data.reports)
+        setResult(importResult)
+      } else {
+        setError(data.error || "Import failed")
+      }
+    } catch (err: any) { setError(err.message || "Import failed") }
+    setImporting(false)
+  }
+
+  if (result) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-col items-center gap-3 py-4">
+          <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+          <p className="font-semibold text-slate-900">Import Complete!</p>
+          <p className="text-sm text-slate-500">{result.imported} expenses imported from {result.reports} reports</p>
+        </div>
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="rounded-lg bg-emerald-50 p-3">
+            <p className="text-xl font-bold text-emerald-600">{result.imported}</p>
+            <p className="text-xs text-emerald-600">Imported</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xl font-bold text-slate-700">{result.expenses}</p>
+            <p className="text-xs text-slate-500">Total</p>
+          </div>
+          <div className="rounded-lg bg-indigo-50 p-3">
+            <p className="text-xl font-bold text-indigo-600">{result.currencies.length}</p>
+            <p className="text-xs text-indigo-600">Currencies</p>
+          </div>
+        </div>
+        <p className="text-xs text-slate-400 text-center">Currencies: {result.currencies.join(", ")}</p>
+        <Button className="w-full" onClick={onDone}>Done</Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Partner User ID</Label>
+        <Input
+          value={userId}
+          onChange={(e) => setUserId(e.target.value)}
+          placeholder="aa_yourname_gmail_com"
+          disabled={connected}
+        />
+        <p className="text-xs text-slate-400">Found at expensify.com/tools/integrations</p>
+      </div>
+      <div className="space-y-2">
+        <Label>Partner User Secret</Label>
+        <Input
+          type="password"
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          placeholder="Your API secret"
+          disabled={connected}
+        />
+      </div>
+
+      {connected && (
+        <div className="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 p-3">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          <p className="text-sm text-emerald-800">Connected to Expensify</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 p-3">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
+
+      {!connected ? (
+        <Button className="w-full" onClick={handleTest} disabled={!userId || !secret || testing}>
+          {testing ? <><RefreshCw className="h-4 w-4 animate-spin" /> Testing...</> : "Test Connection"}
+        </Button>
+      ) : (
+        <Button className="w-full" onClick={handleImport} disabled={importing}>
+          {importing ? <><RefreshCw className="h-4 w-4 animate-spin" /> Importing expenses...</> : <><Receipt className="h-4 w-4" /> Import All Expenses</>}
+        </Button>
+      )}
     </div>
   )
 }
