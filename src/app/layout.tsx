@@ -64,7 +64,31 @@ export default function RootLayout({
       >
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var k="fakturator_onboarding";var d=localStorage.getItem(k);if(d){JSON.parse(d)}}catch(e){localStorage.removeItem(k)}`,
+            __html: `
+try{
+  // Fix corrupted/duplicate invoice data in all storage keys
+  var keys=Object.keys(localStorage).filter(function(k){return k.indexOf("fakturator_data")===0});
+  keys.forEach(function(key){
+    try{
+      var raw=localStorage.getItem(key);
+      if(!raw)return;
+      var d=JSON.parse(raw);
+      if(d&&d.invoices&&Array.isArray(d.invoices)){
+        // Deduplicate by invoice number
+        var seen={};
+        d.invoices=d.invoices.filter(function(inv){
+          var n=inv.invoiceNumber;
+          if(seen[n])return false;
+          seen[n]=true;
+          inv.currency="EUR";
+          return true;
+        });
+        localStorage.setItem(key,JSON.stringify(d));
+      }
+    }catch(e){localStorage.removeItem(key)}
+  });
+}catch(e){}
+`,
           }}
         />
         {children}
