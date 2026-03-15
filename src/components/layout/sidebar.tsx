@@ -42,17 +42,25 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
-  const [, forceUpdate] = useState(0)
+  const [companyName, setCompanyName] = useState("")
 
   useEffect(() => {
-    loadOnboarding()
-    return onboardingSubscribe(() => forceUpdate((n) => n + 1))
+    try {
+      loadOnboarding()
+      const state = getOnboardingState()
+      if (state.status === "COMPLETED") {
+        setCompanyName(state.data.company.legalName || state.data.company.tradingName || "")
+      }
+      return onboardingSubscribe(() => {
+        try {
+          const s = getOnboardingState()
+          if (s.status === "COMPLETED") {
+            setCompanyName(s.data.company.legalName || s.data.company.tradingName || "")
+          }
+        } catch {}
+      })
+    } catch {}
   }, [])
-
-  const onboardingState = getOnboardingState()
-  const companyName = onboardingState.status === "COMPLETED"
-    ? onboardingState.data.company.legalName || onboardingState.data.company.tradingName
-    : ""
 
   return (
     <aside
