@@ -218,10 +218,11 @@ export function addInvoice(data: {
   paymentMethod?: string
   currency?: string
   notes?: string
+  invoiceNumber?: string
   items: Omit<InvoiceItem, 'id' | 'invoiceId'>[]
 }): Invoice {
   const client = getClient(data.clientId)
-  const invoiceNumber = generateInvoiceNumber(data.type)
+  const invoiceNumber = data.invoiceNumber || generateInvoiceNumber(data.type)
 
   const items: InvoiceItem[] = data.items.map((item, i) => ({
     ...item,

@@ -171,6 +171,7 @@ export function importNinjaDataToStore(data: {
       const created = addInvoice({
         clientId,
         type: "VAT",
+        invoiceNumber: inv.number || undefined,
         issueDate: inv.date || undefined,
         saleDate: inv.date || undefined,
         dueDate,
