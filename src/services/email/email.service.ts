@@ -1,4 +1,4 @@
-// @ts-nocheck
+import { Resend } from "resend"
 
 export interface EmailMessage {
   to: string[]
@@ -17,22 +17,58 @@ export interface EmailSendResult {
   timestamp: Date
 }
 
-// Mock email sender - replace with SMTP/SendGrid/SES in production
+// Production email sender using Resend
 export async function sendEmail(message: EmailMessage): Promise<EmailSendResult> {
-  console.log(`[EMAIL] Sending to: ${message.to.join(', ')}`)
-  console.log(`[EMAIL] Subject: ${message.subject}`)
-  console.log(`[EMAIL] CC: ${message.cc?.join(', ') || 'none'}`)
+  const apiKey = process.env.RESEND_API_KEY
 
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 200))
+  // Fallback to mock if no API key configured
+  if (!apiKey) {
+    console.warn("[EMAIL] No RESEND_API_KEY — using mock sender")
+    return mockSendEmail(message)
+  }
 
-  // Mock: 95% success rate
-  const success = Math.random() > 0.05
+  try {
+    const resend = new Resend(apiKey)
 
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || "Fakturator <invoices@fakturator.pl>",
+      to: message.to,
+      cc: message.cc,
+      bcc: message.bcc,
+      subject: message.subject,
+      html: message.htmlBody || message.body,
+      attachments: message.attachments?.map((a) => ({
+        filename: a.filename,
+        content: typeof a.content === "string" ? Buffer.from(a.content) : a.content,
+        contentType: a.contentType,
+      })),
+    })
+
+    if (error) {
+      return { success: false, error: error.message, timestamp: new Date() }
+    }
+
+    return {
+      success: true,
+      messageId: data?.id,
+      timestamp: new Date(),
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || "Email send failed",
+      timestamp: new Date(),
+    }
+  }
+}
+
+// Mock sender for development
+async function mockSendEmail(message: EmailMessage): Promise<EmailSendResult> {
+  console.log(`[EMAIL-MOCK] To: ${message.to.join(", ")} | Subject: ${message.subject}`)
+  await new Promise((r) => setTimeout(r, 100))
   return {
-    success,
-    messageId: success ? `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` : undefined,
-    error: success ? undefined : 'SMTP connection timeout',
+    success: true,
+    messageId: `mock_${Date.now()}`,
     timestamp: new Date(),
   }
 }
