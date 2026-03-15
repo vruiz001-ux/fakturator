@@ -35,6 +35,23 @@ export function importNinjaDataToStore(data: {
     const p = data.companyProfile
     const address = [p.address1, p.address2].filter(Boolean).join(", ")
     const nip = p.vatNumber?.replace(/^PL/i, "") || ""
+
+    // Extract bank details from invoice public_notes (Ninja stores them as HTML)
+    let swift = ""
+    let iban = ""
+    if (data.invoices?.length > 0) {
+      for (const inv of data.invoices) {
+        const notes = (inv as any).public_notes || ""
+        if (notes) {
+          const swiftMatch = notes.match(/Swift\s*:\s*([A-Z]{8,11})/i)
+          const ibanMatch = notes.match(/IBAN\s*:\s*(PL[\d\s]{20,40})/i)
+          if (swiftMatch) swift = swiftMatch[1].trim()
+          if (ibanMatch) iban = ibanMatch[1].replace(/\s+/g, " ").trim()
+          if (swift && iban) break
+        }
+      }
+    }
+
     setCompany({
       name: p.name,
       address,
@@ -44,6 +61,8 @@ export function importNinjaDataToStore(data: {
       nip,
       email: p.email,
       phone: p.phone,
+      bankName: swift || undefined,
+      bankAccount: iban || undefined,
     })
   } else if (data.companyName) {
     setCompany({ name: data.companyName })

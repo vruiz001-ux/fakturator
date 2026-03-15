@@ -237,6 +237,20 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                   <p className="text-sm text-slate-600">{invoice.notes}</p>
                 </div>
               )}
+
+              {/* Bank Details Footer */}
+              {(getCompany().bankAccount || getCompany().bankName) && (
+                <div className="mt-6 border-t border-slate-200 pt-4">
+                  <div className="flex items-center gap-6 text-sm text-slate-600">
+                    {getCompany().bankName && (
+                      <span><span className="font-medium text-slate-500">Swift:</span> {getCompany().bankName}</span>
+                    )}
+                    {getCompany().bankAccount && (
+                      <span><span className="font-medium text-slate-500">IBAN:</span> {getCompany().bankAccount}</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
