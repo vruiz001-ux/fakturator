@@ -159,9 +159,39 @@ export default function DashboardPage() {
 
   const hasData = invoices.length > 0
 
-  // Currency display
+  // Currency display with FX conversion
   const displayCurrency = getDisplayCurrency()
-  const fc = (amount: number) => formatCurrency(amount, displayCurrency)
+
+  // FX rates for conversion (mock rates — same as fx.service.ts)
+  const FX_RATES: Record<string, Record<string, number>> = {
+    PLN: { EUR: 0.2326, USD: 0.2533, GBP: 0.1996, PLN: 1 },
+    EUR: { PLN: 4.2989, USD: 1.0890, GBP: 0.8583, EUR: 1 },
+    USD: { PLN: 3.9475, EUR: 0.9183, GBP: 0.7882, USD: 1 },
+    GBP: { PLN: 5.0085, EUR: 1.1651, USD: 1.2688, GBP: 1 },
+  }
+
+  // Convert amount from source currency to display currency
+  const convert = (amount: number, fromCurrency?: string) => {
+    const from = fromCurrency || "EUR"
+    if (from === displayCurrency) return amount
+    const rate = FX_RATES[from]?.[displayCurrency] || 1
+    return Math.round(amount * rate * 100) / 100
+  }
+
+  const fc = (amount: number, fromCurrency?: string) =>
+    formatCurrency(convert(amount, fromCurrency), displayCurrency)
+
+  // ─── Converted Stats ─────────────────────────────────────
+
+  // Recompute stats with FX conversion
+  const totalRevenue = invoices.reduce((s, i) => s + convert(i.subtotal, i.currency), 0)
+  const totalInvoiced = invoices.reduce((s, i) => s + convert(i.total, i.currency), 0)
+  const totalPaid = invoices.filter(i => i.status === "PAID").reduce((s, i) => s + convert(i.total, i.currency), 0)
+  const totalUnpaid = invoices.filter(i => ["SENT", "DRAFT", "PARTIALLY_PAID"].includes(i.status)).reduce((s, i) => s + convert(i.total - i.paidAmount, i.currency), 0)
+  const totalOverdue = invoices.filter(i => i.status === "OVERDUE").reduce((s, i) => s + convert(i.total - i.paidAmount, i.currency), 0)
+  const totalExpenses = expenses.reduce((s, e) => s + convert(e.grossAmount, e.currency), 0)
+  const netIncome = totalPaid - totalExpenses
+  const avgInvoiceValue = invoices.length > 0 ? totalInvoiced / invoices.length : 0
 
   // ─── Computed Data ───────────────────────────────────────
 
@@ -170,26 +200,25 @@ export default function DashboardPage() {
     invoices.reduce((acc: Record<string, { revenue: number; expenses: number }>, inv) => {
       const key = new Date(inv.issueDate).toLocaleString("en", { month: "short", year: "numeric" })
       if (!acc[key]) acc[key] = { revenue: 0, expenses: 0 }
-      acc[key].revenue += inv.subtotal
+      acc[key].revenue += convert(inv.subtotal, inv.currency)
       return acc
     }, {})
   ).map(([month, data]) => {
-    // Add expenses to each month
     expenses.forEach((exp) => {
       const expKey = new Date(exp.date).toLocaleString("en", { month: "short", year: "numeric" })
       if (expKey === month) {
-        data.expenses += exp.grossAmount
+        data.expenses += convert(exp.grossAmount, exp.currency)
       }
     })
     return { month, ...data, profit: data.revenue - data.expenses }
   })
 
-  // Invoice status breakdown
+  // Invoice status breakdown (converted)
   const statusBreakdown = Object.entries(
     invoices.reduce((acc: Record<string, { count: number; total: number }>, inv) => {
       if (!acc[inv.status]) acc[inv.status] = { count: 0, total: 0 }
       acc[inv.status].count++
-      acc[inv.status].total += inv.total
+      acc[inv.status].total += convert(inv.total, inv.currency)
       return acc
     }, {})
   ).map(([status, data]) => ({ status, ...data }))
@@ -201,13 +230,13 @@ export default function DashboardPage() {
     count: s.count,
   }))
 
-  // Revenue by service (group by item descriptions)
+  // Revenue by service (converted)
   const serviceBarData = Object.entries(
     invoices.reduce((acc: Record<string, { revenue: number; count: number }>, inv) => {
       inv.items.forEach((item) => {
         const name = item.service?.name || item.description || "Other"
         if (!acc[name]) acc[name] = { revenue: 0, count: 0 }
-        acc[name].revenue += item.netAmount
+        acc[name].revenue += convert(item.netAmount, inv.currency)
         acc[name].count++
       })
       return acc
@@ -221,14 +250,14 @@ export default function DashboardPage() {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 8)
 
-  // Expenses by category
+  // Expenses by category (converted)
   const expensePieData = Object.entries(
     expenses.reduce((acc: Record<string, { total: number; count: number; categoryId: string }>, exp) => {
       const catId = exp.categoryId || "uncategorized"
       const cat = expenseCategories.find((c) => c.id === catId)
       const name = cat?.name || exp.category?.name || "Uncategorized"
       if (!acc[name]) acc[name] = { total: 0, count: 0, categoryId: catId }
-      acc[name].total += exp.grossAmount
+      acc[name].total += convert(exp.grossAmount, exp.currency)
       acc[name].count++
       return acc
     }, {})
@@ -241,17 +270,17 @@ export default function DashboardPage() {
     }
   })
 
-  // Top clients
+  // Top clients (converted)
   const topClients = Object.entries(
     invoices.reduce(
       (acc: Record<string, { clientId: string; clientName: string; revenue: number; invoiceCount: number; paidAmount: number; overdueAmount: number }>, inv) => {
         const cid = inv.clientId
         const cname = inv.client?.name || clients.find((c) => c.id === cid)?.name || "Unknown"
         if (!acc[cid]) acc[cid] = { clientId: cid, clientName: cname, revenue: 0, invoiceCount: 0, paidAmount: 0, overdueAmount: 0 }
-        acc[cid].revenue += inv.total
+        acc[cid].revenue += convert(inv.total, inv.currency)
         acc[cid].invoiceCount++
-        if (inv.status === "PAID") acc[cid].paidAmount += inv.total
-        if (inv.status === "OVERDUE") acc[cid].overdueAmount += inv.total - inv.paidAmount
+        if (inv.status === "PAID") acc[cid].paidAmount += convert(inv.total, inv.currency)
+        if (inv.status === "OVERDUE") acc[cid].overdueAmount += convert(inv.total - inv.paidAmount, inv.currency)
         return acc
       },
       {}
@@ -271,21 +300,18 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
     .slice(0, 5)
 
-  // KPI calculations
-  const totalRevenue = stats.totalInvoiced
+  // KPI calculations (using converted totals from above)
   const previousMonthRevenue = revenueByMonth.length >= 2 ? revenueByMonth[revenueByMonth.length - 2]?.revenue ?? 0 : 0
   const currentMonthRevenue = revenueByMonth.length >= 1 ? revenueByMonth[revenueByMonth.length - 1]?.revenue ?? 0 : 0
   const revenueTrend = previousMonthRevenue > 0
     ? ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100
     : 0
   const revenueTrendUp = revenueTrend >= 0
-
-  const totalExpenses = stats.totalExpenses
   const unpaidCount = invoices.filter((i) => ["SENT", "DRAFT", "PARTIALLY_PAID"].includes(i.status)).length
 
-  // VAT summary
-  const outputVat = invoices.reduce((s, i) => s + i.vatTotal, 0)
-  const inputVat = expenses.reduce((s, e) => s + e.vatAmount, 0)
+  // VAT summary (converted)
+  const outputVat = invoices.reduce((s, i) => s + convert(i.vatTotal, i.currency), 0)
+  const inputVat = expenses.reduce((s, e) => s + convert(e.vatAmount, e.currency), 0)
   const vatDue = outputVat - inputVat
 
   // ─── Empty State ────────────────────────────────────────
@@ -401,7 +427,7 @@ export default function DashboardPage() {
             <div className="mt-4">
               <p className="text-sm font-medium text-slate-500">Outstanding Receivables</p>
               <p className="mt-1 text-2xl font-bold text-amber-600">
-                {fc(stats.totalUnpaid)}
+                {fc(totalUnpaid)}
               </p>
               <p className="mt-1 text-xs text-slate-400">
                 Across {unpaidCount + stats.overdueCount} invoices
@@ -426,7 +452,7 @@ export default function DashboardPage() {
                 {stats.paidCount} / {stats.invoiceCount}
               </p>
               <p className="mt-1 text-xs text-slate-400">
-                {fc(stats.totalPaid)} collected
+                {fc(totalPaid)} collected
               </p>
             </div>
           </CardContent>
@@ -447,7 +473,7 @@ export default function DashboardPage() {
             <div className="mt-4">
               <p className="text-sm font-medium text-slate-500">Overdue Amount</p>
               <p className="mt-1 text-2xl font-bold text-red-600">
-                {fc(stats.totalOverdue)}
+                {fc(totalOverdue)}
               </p>
               <p className="mt-1 text-xs text-slate-400">
                 {stats.overdueRatio.toFixed(0)}% of total invoiced
@@ -472,7 +498,7 @@ export default function DashboardPage() {
                 <CardDescription className="mt-1">Monthly revenue, expenses & profit</CardDescription>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold text-slate-900">{fc(stats.netIncome)}</p>
+                <p className="text-2xl font-bold text-slate-900">{fc(netIncome)}</p>
                 <p className="text-xs text-slate-500">Net income</p>
               </div>
             </div>
@@ -944,7 +970,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-xs font-medium text-slate-400">Avg Invoice</p>
                 <p className="text-lg font-bold text-slate-900">
-                  {fc(stats.averageInvoiceValue)}
+                  {fc(avgInvoiceValue)}
                 </p>
               </div>
             </div>
@@ -988,7 +1014,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-xs font-medium text-slate-400">Net Income</p>
                 <p className="text-lg font-bold text-slate-900">
-                  {fc(stats.netIncome)}
+                  {fc(netIncome)}
                 </p>
               </div>
             </div>
