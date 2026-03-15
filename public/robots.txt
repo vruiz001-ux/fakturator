@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /invoices
+Disallow: /clients
+Disallow: /services
+Disallow: /expenses
+Disallow: /reports
+Disallow: /ksef
+Disallow: /ai
+Disallow: /settings
+Disallow: /migration
+Disallow: /integrations
+Disallow: /onboarding
+Disallow: /api/
+
+Sitemap: https://fakturator.pl/sitemap.xml

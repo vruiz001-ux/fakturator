@@ -1,0 +1,561 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum InvoiceType {
+  VAT
+  PROFORMA
+  CORRECTION
+  ADVANCE
+  RECURRING
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+  CORRECTED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CASH
+  CARD
+  ONLINE
+  OTHER
+}
+
+enum Unit {
+  HOUR
+  PIECE
+  SERVICE
+  PROJECT
+  MONTH
+  DAY
+  KG
+  M2
+  OTHER
+}
+
+enum RecurringFrequency {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum KsefStatus {
+  PENDING
+  VALIDATED
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  ERROR
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+// ─── User & Organization ─────────────────────────────────
+
+model User {
+  id             String        @id @default(cuid())
+  email          String        @unique
+  name           String
+  passwordHash   String
+  role           UserRole      @default(OWNER)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  auditLogs      AuditLog[]
+  aiInteractions AIInteraction[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([email])
+  @@index([organizationId])
+}
+
+model Organization {
+  id                 String            @id @default(cuid())
+  name               String
+  address            String?
+  city               String?
+  postalCode         String?
+  country            String            @default("PL")
+  nip                String?
+  phone              String?
+  email              String?
+  website            String?
+  bankName           String?
+  bankAccount        String?
+  defaultCurrency    String            @default("PLN")
+  defaultVatRate     Float             @default(23)
+  defaultPaymentDays Int               @default(14)
+  logoUrl            String?
+  users              User[]
+  clients            Client[]
+  invoices           Invoice[]
+  services           Service[]
+  recurringRules     RecurringRule[]
+  expenses           Expense[]
+  expenseCategories  ExpenseCategory[]
+  suppliers          Supplier[]
+  taxSettings        TaxSetting?
+  ksefSubmissions    KsefSubmission[]
+  auditLogs          AuditLog[]
+  aiInteractions     AIInteraction[]
+  migrationImports   MigrationImport[]
+  integrations       IntegrationConfig[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([nip])
+}
+
+// ─── Client ──────────────────────────────────────────────
+
+model Client {
+  id                    String         @id @default(cuid())
+  organizationId        String
+  organization          Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                  String
+  email                 String?
+  phone                 String?
+  address               String?
+  city                  String?
+  postalCode            String?
+  country               String         @default("PL")
+  nip                   String?
+  contactPerson         String?
+  notes                 String?
+  tags                  String[]
+  isActive              Boolean        @default(true)
+  // Invoice email delivery
+  invoiceEmail          String?        // primary billing email
+  invoiceEmailCc        String[]       // CC recipients
+  invoiceEmailBcc       String[]       // BCC recipients
+  financeEmail          String?        // accounts payable email
+  autoSendInvoices      Boolean        @default(true)
+  // Relations
+  invoices              Invoice[]
+  recurringRules        RecurringRule[]
+  expenses              Expense[]      @relation("ExpenseClient")
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([organizationId])
+  @@index([name])
+  @@index([nip])
+  @@index([isActive])
+}
+
+// ─── Service ─────────────────────────────────────────────
+
+model Service {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  defaultRate    Float?
+  defaultUnit    Unit          @default(SERVICE)
+  defaultVatRate Float         @default(23)
+  category       String?
+  isActive       Boolean       @default(true)
+  invoiceItems   InvoiceItem[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([organizationId])
+  @@index([category])
+}
+
+// ─── Invoice ─────────────────────────────────────────────
+
+model Invoice {
+  id                   String           @id @default(cuid())
+  organizationId       String
+  organization         Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientId             String
+  client               Client           @relation(fields: [clientId], references: [id])
+  invoiceNumber        String
+  type                 InvoiceType      @default(VAT)
+  status               InvoiceStatus    @default(DRAFT)
+  issueDate            DateTime         @default(now())
+  saleDate             DateTime?
+  dueDate              DateTime
+  paymentMethod        PaymentMethod    @default(BANK_TRANSFER)
+  currency             String           @default("PLN")
+  subtotal             Float            @default(0)
+  vatTotal             Float            @default(0)
+  total                Float            @default(0)
+  paidAmount           Float            @default(0)
+  notes                String?
+  items                InvoiceItem[]
+  payments             Payment[]
+  reminders            Reminder[]
+  correctedInvoiceId   String?
+  correctedInvoice     Invoice?         @relation("InvoiceCorrection", fields: [correctedInvoiceId], references: [id])
+  corrections          Invoice[]        @relation("InvoiceCorrection")
+  recurringRuleId      String?
+  recurringRule        RecurringRule?   @relation(fields: [recurringRuleId], references: [id])
+  ksefReferenceId      String?
+  ksefStatus           KsefStatus?
+  ksefSubmittedAt      DateTime?
+  ksefValidationErrors Json?
+  ksefSubmissions      KsefSubmission[]
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@unique([organizationId, invoiceNumber])
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([status])
+  @@index([type])
+  @@index([issueDate])
+  @@index([dueDate])
+  @@index([ksefStatus])
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  serviceId   String?
+  service     Service? @relation(fields: [serviceId], references: [id])
+  description String
+  quantity    Float    @default(1)
+  unit        Unit     @default(SERVICE)
+  unitPrice   Float
+  vatRate     Float    @default(23)
+  netAmount   Float
+  vatAmount   Float
+  grossAmount Float
+  sortOrder   Int      @default(0)
+
+  @@index([invoiceId])
+  @@index([serviceId])
+}
+
+// ─── Recurring ───────────────────────────────────────────
+
+model RecurringRule {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientId       String
+  client         Client             @relation(fields: [clientId], references: [id])
+  frequency      RecurringFrequency @default(MONTHLY)
+  nextRunDate    DateTime
+  isActive       Boolean            @default(true)
+  templateData   Json
+  invoices       Invoice[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([organizationId])
+  @@index([nextRunDate])
+}
+
+// ─── Payment ─────────────────────────────────────────────
+
+model Payment {
+  id        String        @id @default(cuid())
+  invoiceId String
+  invoice   Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount    Float
+  date      DateTime      @default(now())
+  method    PaymentMethod @default(BANK_TRANSFER)
+  reference String?
+  notes     String?
+  createdAt DateTime      @default(now())
+
+  @@index([invoiceId])
+  @@index([date])
+}
+
+// ─── Expense ─────────────────────────────────────────────
+
+model Expense {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplierId     String?
+  supplier       Supplier?        @relation(fields: [supplierId], references: [id])
+  categoryId     String?
+  category       ExpenseCategory? @relation(fields: [categoryId], references: [id])
+  invoiceNumber  String?
+  description    String
+  date           DateTime         @default(now())
+  netAmount      Float
+  vatRate        Float            @default(23)
+  vatAmount      Float
+  grossAmount    Float
+  currency       String           @default("PLN")
+  notes          String?
+  clientId            String?
+  client              Client?          @relation("ExpenseClient", fields: [clientId], references: [id])
+  isBillable          Boolean          @default(false)
+  isRebilled          Boolean          @default(false)
+  rebilledInvoiceId   String?
+  rebilledAt          DateTime?
+  markup              Float            @default(0)
+  // FX conversion fields
+  originalCurrency    String?          // original expense currency if different
+  originalAmount      Float?           // original amount before FX conversion
+  fxRate              Float?           // exchange rate used
+  fxRateDate          DateTime?        // date of the FX rate
+  fxRateSource        String?          // source: MANUAL, ECB, NBP, MOCK
+  convertedEurAmount  Float?           // amount in EUR after conversion
+  fxUpliftPercent     Float?           // uplift % applied (default 5)
+  fxUpliftAmount      Float?           // uplift amount in EUR
+  finalRebillAmount   Float?           // final rebillable EUR amount (converted + uplift)
+  isForeignCurrency   Boolean          @default(false)
+  fxLocked            Boolean          @default(false) // prevent recalculation once invoiced
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([organizationId])
+  @@index([categoryId])
+  @@index([supplierId])
+  @@index([date])
+  @@index([clientId])
+  @@index([isBillable])
+  @@index([isRebilled])
+  @@index([isForeignCurrency])
+}
+
+model ExpenseCategory {
+  id                    String       @id @default(cuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                  String
+  color                 String       @default("#6366f1")
+  icon                  String?
+  isDefault             Boolean      @default(false)
+  eligibleForFxRebill   Boolean      @default(false)
+  eligibleForFxUplift   Boolean      @default(true)
+  expenses              Expense[]
+
+  @@index([organizationId])
+}
+
+model Supplier {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  nip            String?
+  address        String?
+  city           String?
+  postalCode     String?
+  country        String       @default("PL")
+  email          String?
+  phone          String?
+  isActive       Boolean      @default(true)
+  expenses       Expense[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([nip])
+}
+
+// ─── Reminders ───────────────────────────────────────────
+
+model Reminder {
+  id            String    @id @default(cuid())
+  invoiceId     String
+  invoice       Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  scheduledDate DateTime
+  sentAt        DateTime?
+  type          String    @default("EMAIL")
+  message       String?
+  createdAt     DateTime  @default(now())
+
+  @@index([invoiceId])
+  @@index([scheduledDate])
+}
+
+// ─── Tax Settings ────────────────────────────────────────
+
+model TaxSetting {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vatRates       Json         @default("[23, 8, 5, 0]")
+  defaultVatRate Float        @default(23)
+  fiscalYearStart Int         @default(1)
+  updatedAt      DateTime     @updatedAt
+}
+
+// ─── KSeF ────────────────────────────────────────────────
+
+model KsefSubmission {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  referenceId    String?
+  status         KsefStatus   @default(PENDING)
+  submittedAt    DateTime?
+  response       Json?
+  errors         Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([invoiceId])
+  @@index([status])
+}
+
+// ─── Audit & AI ──────────────────────────────────────────
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  action         String
+  entityType     String
+  entityId       String?
+  details        Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+model AIInteraction {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  prompt         String
+  response       String?
+  type           String       @default("GENERAL")
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([type])
+}
+
+// ─── Migration & Integration ────────────────────────────
+
+model MigrationImport {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source          String       @default("NINJA_INVOICE")
+  status          String       @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  fileName        String?
+  totalRecords    Int          @default(0)
+  importedRecords Int          @default(0)
+  failedRecords   Int          @default(0)
+  errors          Json?
+  mappings        Json?
+  importedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+model IntegrationConfig {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider       String       // EXPENSIFY, NINJA_INVOICE, etc.
+  isActive       Boolean      @default(false)
+  config         Json?        // API keys, settings, etc.
+  lastSyncAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, provider])
+  @@index([organizationId])
+}
+
+// ─── Invoice Email Delivery ──────────────────────────────
+
+model InvoiceEmailEvent {
+  id           String   @id @default(cuid())
+  invoiceId    String
+  status       String   @default("PENDING") // PENDING, SENT, DELIVERED, FAILED, RESENT
+  recipients   String[] // to addresses
+  ccRecipients String[] // cc addresses
+  bccRecipients String[] // bcc addresses
+  subject      String
+  body         String?
+  sentAt       DateTime?
+  errorMessage String?
+  isAutoSend   Boolean  @default(false)
+  triggeredBy  String?  // userId or "SYSTEM"
+  createdAt    DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DeliverySettings {
+  id                      String   @id @default(cuid())
+  organizationId          String   @unique
+  autoSendOnValidation    Boolean  @default(true)
+  defaultInternalCc       String[] // finance team emails
+  defaultSubjectTemplate  String   @default("Invoice {invoiceNumber} from {companyName}")
+  defaultBodyTemplate     String   @default("")
+  senderName              String?
+  senderEmail             String?
+  replyToEmail            String?
+  updatedAt               DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+// ─── FX Rates ────────────────────────────────────────────
+
+model FxRate {
+  id           String   @id @default(cuid())
+  baseCurrency String   // e.g. "PLN"
+  targetCurrency String // e.g. "EUR"
+  rate         Float    // 1 base = X target
+  rateDate     DateTime
+  source       String   @default("MANUAL") // MANUAL, ECB, NBP, MOCK
+  createdAt    DateTime @default(now())
+
+  @@unique([baseCurrency, targetCurrency, rateDate, source])
+  @@index([baseCurrency, targetCurrency])
+  @@index([rateDate])
+}
+
+model FxRebillConfig {
+  id                    String  @id @default(cuid())
+  organizationId        String  @unique
+  defaultRebillCurrency String  @default("EUR")
+  defaultFxUpliftPercent Float  @default(5)
+  autoApplyUplift       Boolean @default(true)
+  updatedAt             DateTime @updatedAt
+
+  @@index([organizationId])
+}
