@@ -162,6 +162,8 @@ function normalizeKrsResponse(data: any, krsNumber: string): KrsCompanyRecord {
       voivodeship: capitalizeCity(latestSiedziba?.wojewodztwo || ""),
       country: "PL",
     },
+    email: siedzibaIAdres?.adresPocztyElektronicznej?.toLowerCase() || undefined,
+    website: siedzibaIAdres?.adresStronyInternetowej?.toLowerCase() || undefined,
     registrationDate: header?.dataRejestracjiWKRS,
     lastEntryDate: header?.dataOstatniegoWpisu,
     lastEntryNumber: header?.numerostatniegoWpisu,

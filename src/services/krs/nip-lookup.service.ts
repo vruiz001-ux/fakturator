@@ -99,6 +99,7 @@ function normalizeWhiteListResponse(subject: any): KrsCompanyRecord {
       voivodeship: "",
       country: "PL",
     },
+    vatStatus: subject.statusVat || undefined,
     registrationDate: subject.registrationLegalDate,
     source: "KRS_API",
     fetchedAt: new Date().toISOString(),

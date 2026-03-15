@@ -1,52 +1,100 @@
+"use client"
+
+import { useState, useCallback } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
-  Zap,
-  FileText,
-  BarChart3,
-  Shield,
-  Sparkles,
-  ArrowRight,
-  CheckCircle2,
-  Receipt,
-  ArrowLeftRight,
+  Zap, FileText, BarChart3, Receipt, ArrowLeftRight,
+  ArrowRight, CheckCircle2, Sparkles, Shield, Building2,
+  CreditCard, Globe,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { KrsLookup } from "@/components/onboarding/krs-lookup"
+import { updateStepData, markStepComplete, setCurrentStep, loadOnboarding } from "@/lib/onboarding/onboarding.store"
+import type { CompanySetup, BillingSetup } from "@/lib/onboarding/onboarding.types"
+import type { CompanySourceMetadata } from "@/services/krs/krs.types"
 
 const features = [
   {
     icon: FileText,
     title: "Smart Invoicing",
-    description: "AI-powered invoice creation with Polish compliance. Auto-fill, natural language input, VAT calculations, and PDF generation built in.",
+    description: "AI-powered invoice creation with Polish compliance. Auto-fill, VAT calculations, and PDF generation built in.",
   },
   {
     icon: Receipt,
     title: "Expense Recovery",
-    description: "Track, assign, and rebill expenses to clients automatically. Never lose money on project costs again with smart expense matching.",
+    description: "Track and rebill expenses to clients automatically. Never lose money on project costs again.",
   },
   {
     icon: ArrowLeftRight,
     title: "Easy Migration",
-    description: "Switch from Ninja Invoice in minutes with full history import. Clients, invoices, and settings migrate seamlessly.",
+    description: "Switch from Ninja Invoice in minutes. Clients, invoices, and settings migrate seamlessly.",
   },
   {
     icon: BarChart3,
     title: "Business Intelligence",
-    description: "Real-time dashboard with revenue, expenses, and actionable KPIs. Track profitability per client, service, and time period.",
+    description: "Real-time dashboard with revenue, expenses, and actionable KPIs per client and service.",
   },
 ]
 
-const highlights = [
-  "Full Polish VAT invoice support",
-  "NIP validation and auto-lookup",
-  "PLN and EUR currency support",
-  "Expense rebilling and recovery",
-  "Ninja Invoice migration wizard",
-  "Client expense tracking",
-  "Service performance analytics",
-  "PDF generation and email workflows",
-  "KSeF compliance readiness",
+const previews = [
+  {
+    icon: BarChart3,
+    title: "Dashboard Analytics",
+    description: "Revenue trends, outstanding invoices, and cash flow forecasts updated in real time.",
+  },
+  {
+    icon: FileText,
+    title: "Invoice Management",
+    description: "Create, send, and track invoices with automatic VAT handling and KSeF submission.",
+  },
+  {
+    icon: Receipt,
+    title: "Expense Tracking",
+    description: "Capture costs, assign to projects, and generate rebilling invoices with one click.",
+  },
 ]
 
 export default function LandingPage() {
+  const router = useRouter()
+  const [companyData, setCompanyData] = useState<Partial<CompanySetup>>({})
+  const [billingData, setBillingData] = useState<Partial<BillingSetup>>({})
+  const [sourceMetadata, setSourceMetadata] = useState<CompanySourceMetadata | null>(null)
+
+  const handleCompanySelected = useCallback(
+    (company: Partial<CompanySetup>, billing: Partial<BillingSetup>, metadata: CompanySourceMetadata, filledFields: string[]) => {
+      setCompanyData(company)
+      setBillingData(billing)
+      setSourceMetadata(metadata)
+    },
+    [],
+  )
+
+  const handleContinue = () => {
+    loadOnboarding()
+    if (companyData.legalName) {
+      updateStepData("company", companyData)
+    }
+    if (billingData.nip || billingData.address) {
+      updateStepData("billing", billingData)
+    }
+    markStepComplete(0)
+    if (companyData.legalName) markStepComplete(1)
+    if (billingData.address && billingData.nip) {
+      markStepComplete(2)
+      setCurrentStep(3)
+    } else {
+      setCurrentStep(1)
+    }
+    router.push("/onboarding")
+  }
+
+  const hasCompany = !!companyData.legalName
+
   return (
     <div className="min-h-screen bg-white">
       {/* Nav */}
@@ -59,103 +107,152 @@ export default function LandingPage() {
             <span className="text-lg font-bold text-slate-900">Fakturator</span>
           </div>
           <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
-            >
+            <Link href="/login" className="px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900">
               Sign in
             </Link>
-            <Link
-              href="/signup"
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
-            >
+            <Button onClick={() => router.push("/onboarding")} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
               Start Free
-            </Link>
+            </Button>
           </div>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="relative overflow-hidden pt-32 pb-20">
-        <div className="absolute inset-0 bg-gradient-to-b from-indigo-50/50 to-white" />
-        <div className="relative mx-auto max-w-4xl px-6 text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-1.5 text-sm font-medium text-indigo-700">
-            <Sparkles className="h-4 w-4" />
-            Smart Business Console for Polish Companies
+      <section className="relative overflow-hidden pt-28 pb-20">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-slate-50" />
+        <div className="relative mx-auto grid max-w-6xl gap-12 px-6 lg:grid-cols-2 lg:items-center">
+          {/* Left — copy */}
+          <div>
+            <Badge variant="secondary" className="mb-5 gap-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-50">
+              <Sparkles className="h-3.5 w-3.5" />
+              Smart Business Console for Poland
+            </Badge>
+            <h1 className="text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
+              Set up your business{" "}
+              <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+                in 60 seconds
+              </span>
+            </h1>
+            <p className="mt-5 max-w-lg text-lg leading-relaxed text-slate-600">
+              Enter your NIP and we&apos;ll import your company details from the official Polish registry. Start invoicing today.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-5">
+              {[
+                { icon: Shield, label: "Real KRS & NIP data" },
+                { icon: Globe, label: "PLN + EUR support" },
+                { icon: CheckCircle2, label: "KSeF-ready" },
+              ].map((tp) => (
+                <div key={tp.label} className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                  <tp.icon className="h-4 w-4 text-indigo-500" />
+                  {tp.label}
+                </div>
+              ))}
+            </div>
           </div>
-          <h1 className="text-5xl font-bold leading-tight tracking-tight text-slate-900 sm:text-6xl">
-            Your business,
-            <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-              {" "}fully in control
-            </span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-600">
-            Smart Business Console for Polish companies. AI invoicing, expense recovery and rebilling,
-            Ninja Invoice migration, real-time dashboard, and KSeF compliance — all in one place.
-          </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link
-              href="/signup"
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700 hover:shadow-xl hover:shadow-indigo-200"
-            >
-              Start Free
-              <ArrowRight className="h-5 w-5" />
-            </Link>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-8 py-3.5 text-base font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
-            >
-              See Demo
-            </Link>
-          </div>
+
+          {/* Right — onboarding panel */}
+          <Card className="border border-slate-200 shadow-lg shadow-slate-200/60">
+            <CardContent className="space-y-5 p-6">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Start your company setup</h2>
+                <p className="mt-1 text-sm text-slate-500">Search by NIP, company name, or KRS number</p>
+              </div>
+
+              <KrsLookup
+                onCompanySelected={handleCompanySelected}
+                currentSourceMetadata={sourceMetadata ?? undefined}
+                onClear={() => {
+                  setCompanyData({})
+                  setBillingData({})
+                  setSourceMetadata(null)
+                }}
+              />
+
+              {hasCompany && (
+                <div className="space-y-3 rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-indigo-700">
+                    <Building2 className="h-4 w-4" />
+                    Company details imported
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label className="text-xs text-slate-500">Legal name</Label>
+                      <Input value={companyData.legalName ?? ""} readOnly className="mt-1 bg-white text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-500">NIP</Label>
+                      <Input value={billingData.nip ?? ""} readOnly className="mt-1 bg-white text-sm" />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label className="text-xs text-slate-500">Address</Label>
+                      <Input
+                        value={[billingData.address, billingData.postalCode, billingData.city].filter(Boolean).join(", ")}
+                        readOnly
+                        className="mt-1 bg-white text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <Button onClick={handleContinue} className="w-full bg-indigo-600 hover:bg-indigo-700" size="lg">
+                Continue Setup
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+
+              <p className="text-center text-sm text-slate-400">
+                or{" "}
+                <Link href="/onboarding" className="font-medium text-indigo-600 hover:text-indigo-700">
+                  enter details manually
+                </Link>
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
-      {/* Features */}
+      {/* Feature cards */}
       <section className="py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-slate-900">
-              Everything you need to run your business
-            </h2>
-            <p className="mt-3 text-lg text-slate-500">
-              AI invoicing, expense recovery, easy migration, and smart analytics.
-            </p>
+            <h2 className="text-3xl font-bold text-slate-900">Everything you need to run your business</h2>
+            <p className="mt-3 text-lg text-slate-500">AI invoicing, expense recovery, easy migration, and smart analytics.</p>
           </div>
           <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {features.map((feature) => (
+            {features.map((f) => (
               <div
-                key={feature.title}
+                key={f.title}
                 className="group rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-all hover:border-indigo-100 hover:shadow-md"
               >
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white">
-                  <feature.icon className="h-6 w-6" />
+                  <f.icon className="h-6 w-6" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900">{feature.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                  {feature.description}
-                </p>
+                <h3 className="text-lg font-semibold text-slate-900">{f.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">{f.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Highlights */}
+      {/* Product preview */}
       <section className="bg-slate-50 py-24">
-        <div className="mx-auto max-w-4xl px-6">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-slate-900">Built for Polish businesses</h2>
-            <p className="mt-3 text-lg text-slate-500">
-              Comprehensive invoicing that meets Polish legal requirements and KSeF standards.
-            </p>
-          </div>
-          <div className="mt-12 grid gap-4 sm:grid-cols-2">
-            {highlights.map((item) => (
-              <div key={item} className="flex items-center gap-3 rounded-lg p-3">
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
-                <span className="text-sm font-medium text-slate-700">{item}</span>
-              </div>
+        <div className="mx-auto max-w-5xl px-6">
+          <h2 className="text-center text-3xl font-bold text-slate-900">See your business at a glance</h2>
+          <p className="mx-auto mt-3 max-w-xl text-center text-lg text-slate-500">
+            One dashboard, every metric. Track performance across invoices, expenses, and clients.
+          </p>
+          <div className="mt-14 grid gap-8 sm:grid-cols-3">
+            {previews.map((p) => (
+              <Card key={p.title} className="border-slate-100 bg-white">
+                <CardContent className="p-6">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                    <p.icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900">{p.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-500">{p.description}</p>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
@@ -164,19 +261,14 @@ export default function LandingPage() {
       {/* CTA */}
       <section className="py-24">
         <div className="mx-auto max-w-3xl px-6 text-center">
-          <h2 className="text-3xl font-bold text-slate-900">
-            Ready to take control of your business?
-          </h2>
+          <h2 className="text-3xl font-bold text-slate-900">Ready to take control?</h2>
           <p className="mt-4 text-lg text-slate-500">
-            Join businesses across Poland using Fakturator to invoice smarter, recover expenses, and grow with confidence.
+            Join businesses across Poland using Fakturator to invoice smarter and grow with confidence.
           </p>
-          <Link
-            href="/signup"
-            className="mt-8 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-3.5 text-base font-semibold text-white shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700"
-          >
-            Get Started — It&apos;s Free
-            <ArrowRight className="h-5 w-5" />
-          </Link>
+          <Button onClick={() => router.push("/onboarding")} size="lg" className="mt-8 bg-indigo-600 hover:bg-indigo-700">
+            Start Free
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
         </div>
       </section>
 
@@ -189,9 +281,7 @@ export default function LandingPage() {
             </div>
             <span className="text-sm font-semibold text-slate-900">Fakturator</span>
           </div>
-          <p className="text-sm text-slate-400">
-            &copy; {new Date().getFullYear()} Fakturator. All rights reserved.
-          </p>
+          <p className="text-sm text-slate-400">&copy; {new Date().getFullYear()} Fakturator. All rights reserved.</p>
         </div>
       </footer>
     </div>

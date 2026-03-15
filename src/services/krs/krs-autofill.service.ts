@@ -68,6 +68,17 @@ export function mapKrsToOnboarding(record: KrsCompanyRecord): AutofillResult {
     filledFields.push("krs")
   }
 
+  // Email and website from registry
+  if (record.email) {
+    company.email = record.email
+    filledFields.push("email")
+  }
+
+  if (record.website) {
+    company.website = record.website.startsWith("http") ? record.website : `https://${record.website}`
+    filledFields.push("website")
+  }
+
   billing.taxResidency = "PL"
   billing.isVatPayer = true
 

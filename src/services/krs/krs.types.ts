@@ -27,6 +27,9 @@ export interface KrsCompanyRecord {
     voivodeship: string
     country: string
   }
+  email?: string
+  website?: string
+  vatStatus?: string
   registrationDate?: string
   lastEntryDate?: string
   lastEntryNumber?: string
