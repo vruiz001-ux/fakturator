@@ -19,9 +19,11 @@ import {
   ChevronRight,
   ArrowLeftRight,
   Plug,
+  LogOut,
 } from "lucide-react"
 import { getOnboardingState, loadOnboarding, subscribe as onboardingSubscribe } from "@/lib/onboarding/onboarding.store"
 import { getCompany, subscribe as storeSubscribe } from "@/lib/store/data-store"
+import { logout, getAuthUser, loadAuth } from "@/lib/auth/auth.store"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -132,6 +134,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <Settings className="h-5 w-5 shrink-0" />
           {!collapsed && <span>Settings</span>}
         </Link>
+
+        {/* Logout */}
+        <button
+          onClick={() => { logout(); window.location.href = "/login" }}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-400 transition-all hover:bg-red-900/20 hover:text-red-300",
+            collapsed && "justify-center px-2"
+          )}
+          title={collapsed ? "Log out" : undefined}
+        >
+          <LogOut className="h-5 w-5 shrink-0" />
+          {!collapsed && <span>Log out</span>}
+        </button>
 
         {/* Collapse toggle */}
         <button

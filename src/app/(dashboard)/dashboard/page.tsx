@@ -159,22 +159,33 @@ export default function DashboardPage() {
 
   const hasData = invoices.length > 0
 
-  // Currency display with FX conversion
+  // Currency display with live FX conversion
   const displayCurrency = getDisplayCurrency()
+  const [fxRates, setFxRates] = useState<Record<string, number>>({ EUR: 1 })
+  const [fxSource, setFxSource] = useState<string>("")
+  const [fxDate, setFxDate] = useState<string>("")
 
-  // FX rates for conversion (mock rates — same as fx.service.ts)
-  const FX_RATES: Record<string, Record<string, number>> = {
-    PLN: { EUR: 0.2326, USD: 0.2533, GBP: 0.1996, PLN: 1 },
-    EUR: { PLN: 4.2989, USD: 1.0890, GBP: 0.8583, EUR: 1 },
-    USD: { PLN: 3.9475, EUR: 0.9183, GBP: 0.7882, USD: 1 },
-    GBP: { PLN: 5.0085, EUR: 1.1651, USD: 1.2688, GBP: 1 },
-  }
+  // Fetch live FX rates from ECB via our API
+  useEffect(() => {
+    fetch("/api/fx")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.rates) {
+          setFxRates(data.rates)
+          setFxSource(data.source || "")
+          setFxDate(data.date || "")
+        }
+      })
+      .catch(() => {})
+  }, [])
 
-  // Convert amount from source currency to display currency
+  // Convert amount from source currency to display currency using live rates
   const convert = (amount: number, fromCurrency?: string) => {
     const from = fromCurrency || "EUR"
     if (from === displayCurrency) return amount
-    const rate = FX_RATES[from]?.[displayCurrency] || 1
+    const fromRate = fxRates[from] || 1
+    const toRate = fxRates[displayCurrency] || 1
+    const rate = toRate / fromRate
     return Math.round(amount * rate * 100) / 100
   }
 
@@ -359,19 +370,26 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
           <p className="mt-1 text-sm text-slate-500">Financial overview</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Currency</span>
-          <Select value={displayCurrency} onValueChange={(v) => setDisplayCurrency(v)}>
-            <SelectTrigger className="w-24 h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="EUR">EUR</SelectItem>
-              <SelectItem value="PLN">PLN</SelectItem>
-              <SelectItem value="USD">USD</SelectItem>
-              <SelectItem value="GBP">GBP</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-3">
+          {fxSource && fxDate && displayCurrency !== "EUR" && (
+            <span className="text-[10px] text-slate-400 hidden sm:block">
+              {fxSource === "ECB" ? "ECB" : "Fallback"} rates · {fxDate}
+            </span>
+          )}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400">Display</span>
+            <Select value={displayCurrency} onValueChange={(v) => setDisplayCurrency(v)}>
+              <SelectTrigger className="w-24 h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="EUR">EUR €</SelectItem>
+                <SelectItem value="PLN">PLN zł</SelectItem>
+                <SelectItem value="USD">USD $</SelectItem>
+                <SelectItem value="GBP">GBP £</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 

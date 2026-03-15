@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Zap, ArrowRight } from "lucide-react"
@@ -8,20 +8,33 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { login, loadAuth, isAuthenticated } from "@/lib/auth/auth.store"
 
 export default function LoginPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+
+  // Redirect if already logged in
+  useEffect(() => {
+    loadAuth()
+    if (isAuthenticated()) router.replace("/dashboard")
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError("")
     setLoading(true)
-    // Demo: skip auth and go to dashboard
-    setTimeout(() => {
-      router.push("/dashboard")
-    }, 800)
+
+    const result = login(email, password)
+    if (result.success) {
+      router.push("/onboarding")
+    } else {
+      setError(result.error || "Login failed")
+      setLoading(false)
+    }
   }
 
   return (
@@ -43,36 +56,31 @@ export default function LoginPage() {
                 type="email"
                 placeholder="you@company.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setError("") }}
                 required
               />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <button type="button" className="text-xs text-indigo-600 hover:text-indigo-700">
-                  Forgot password?
-                </button>
-              </div>
+              <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
                 placeholder="Enter your password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setError("") }}
                 required
               />
             </div>
+            {error && (
+              <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+            )}
             <Button type="submit" className="w-full" loading={loading}>
               Sign in
               <ArrowRight className="h-4 w-4" />
             </Button>
           </form>
-          <p className="mt-6 text-center text-sm text-slate-500">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="font-medium text-indigo-600 hover:text-indigo-700">
-              Create one
-            </Link>
+          <p className="mt-4 text-center text-xs text-slate-400">
+            First time? Just enter your email and password to create an account.
           </p>
         </CardContent>
       </Card>

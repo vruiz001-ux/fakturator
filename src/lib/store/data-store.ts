@@ -44,7 +44,11 @@ interface DataStore {
   initialized: boolean
 }
 
-const STORAGE_KEY = "fakturator_data"
+import { getUserStorageKey } from "@/lib/auth/auth.store"
+
+function getStorageKey(): string {
+  try { return getUserStorageKey() } catch { return "fakturator_data_guest" }
+}
 
 const store: DataStore = {
   company: { name: "" },
@@ -73,14 +77,14 @@ function persist() {
       expenseCategories: store.expenseCategories,
       payments: store.payments,
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
+    localStorage.setItem(getStorageKey(), JSON.stringify(toSave))
   } catch {}
 }
 
 function loadFromStorage(): boolean {
   if (typeof window === "undefined") return false
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(getStorageKey())
     if (!raw) return false
     const data = JSON.parse(raw)
     if (data && typeof data === "object") {
@@ -97,7 +101,7 @@ function loadFromStorage(): boolean {
       return true
     }
   } catch {
-    try { localStorage.removeItem(STORAGE_KEY) } catch {}
+    try { localStorage.removeItem(getStorageKey()) } catch {}
   }
   return false
 }
@@ -425,7 +429,7 @@ export function clearAllData(): void {
   store.expenseCategories = []
   store.initialized = false
   if (typeof window !== "undefined") {
-    try { localStorage.removeItem(STORAGE_KEY) } catch {}
+    try { localStorage.removeItem(getStorageKey()) } catch {}
   }
   notify()
 }

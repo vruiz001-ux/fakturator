@@ -40,15 +40,17 @@ export default function MigrationPage() {
   const [connectionError, setConnectionError] = useState("")
   const [credentialsLoaded, setCredentialsLoaded] = useState(false)
 
-  // Load saved Ninja credentials from store
+  // Load saved Ninja credentials (per user, securely stored)
   useState(() => {
     try {
+      const { loadSecureToken } = require("@/lib/auth/auth.store")
       const { getNinjaCredentials, initializeStore } = require("@/lib/store/data-store")
       initializeStore()
-      const creds = getNinjaCredentials()
-      if (creds?.apiUrl) setApiUrl(creds.apiUrl)
-      if (creds?.apiToken) setApiToken(creds.apiToken)
-      if (creds?.apiUrl && creds?.apiToken) setCredentialsLoaded(true)
+      const savedUrl = loadSecureToken("ninja_url")
+      const savedToken = loadSecureToken("ninja_token")
+      if (savedUrl) setApiUrl(savedUrl)
+      if (savedToken) setApiToken(savedToken)
+      if (savedUrl && savedToken) setCredentialsLoaded(true)
     } catch {}
   })
 
@@ -84,10 +86,11 @@ export default function MigrationPage() {
       const data = await res.json()
       if (data.success) {
         setConnected(true)
-        // Save credentials for future sessions
+        // Save credentials per-user (securely encoded)
         try {
-          const { setNinjaCredentials } = require("@/lib/store/data-store")
-          setNinjaCredentials({ apiUrl, apiToken })
+          const { saveSecureToken } = require("@/lib/auth/auth.store")
+          saveSecureToken("ninja_url", apiUrl)
+          saveSecureToken("ninja_token", apiToken)
         } catch {}
         setCompanyName(data.companyName || "Connected")
       } else {
