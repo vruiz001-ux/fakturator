@@ -439,12 +439,54 @@ export default function InvoicesPage() {
                         </span>
                       </TableCell>
                       <TableCell className="py-3.5">
-                        <Badge
-                          variant="secondary"
-                          className={`${getStatusColor(invoice.status)} border-0 text-xs font-medium`}
+                        <Select
+                          value={invoice.status}
+                          onValueChange={(newStatus) => {
+                            try { updateInvoiceStatus(invoice.id, newStatus) } catch (e: any) { alert(e.message) }
+                          }}
                         >
-                          {getStatusLabel(invoice.status)}
-                        </Badge>
+                          <SelectTrigger className={`h-7 w-[130px] border-0 text-xs font-medium rounded-full px-2.5 ${getStatusColor(invoice.status)}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="DRAFT" className="text-xs">
+                              <span className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-slate-400" />
+                                Draft
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="SENT" className="text-xs">
+                              <span className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                                Unpaid
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="PAID" className="text-xs">
+                              <span className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                                Paid
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="PARTIALLY_PAID" className="text-xs">
+                              <span className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                                Partially Paid
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="OVERDUE" className="text-xs">
+                              <span className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-red-500" />
+                                Overdue
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="CANCELLED" className="text-xs">
+                              <span className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-slate-300" />
+                                Cancelled
+                              </span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="py-3.5">
                         <DropdownMenu>

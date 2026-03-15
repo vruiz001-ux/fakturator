@@ -264,23 +264,22 @@ export function addInvoice(data: {
   return invoice
 }
 
-export function updateInvoiceStatus(id: string, status: string): Invoice | undefined {
+export function updateInvoiceStatus(id: string, status: string, force = false): Invoice | undefined {
   const inv = store.invoices.find(i => i.id === id)
   if (!inv) return undefined
 
-  // Validate state transitions
-  const validTransitions: Record<string, string[]> = {
-    DRAFT: ['SENT', 'CANCELLED'],
-    SENT: ['PAID', 'PARTIALLY_PAID', 'OVERDUE', 'CANCELLED'],
-    PARTIALLY_PAID: ['PAID', 'OVERDUE', 'CANCELLED'],
-    OVERDUE: ['PAID', 'PARTIALLY_PAID', 'CANCELLED'],
-    PAID: ['CORRECTED'],
-    CANCELLED: [],
-    CORRECTED: [],
+  const validStatuses = ['DRAFT', 'SENT', 'PAID', 'PARTIALLY_PAID', 'OVERDUE', 'CANCELLED', 'CORRECTED']
+  if (!validStatuses.includes(status)) {
+    throw new Error(`Invalid status: ${status}`)
   }
 
-  if (!validTransitions[inv.status]?.includes(status)) {
-    throw new Error(`Invalid status transition: ${inv.status} → ${status}`)
+  // If setting to PAID, update paidAmount to match total
+  if (status === 'PAID' && inv.paidAmount < inv.total) {
+    inv.paidAmount = inv.total
+  }
+  // If setting to SENT/DRAFT/OVERDUE, reset paidAmount to 0
+  if (['DRAFT', 'SENT', 'OVERDUE'].includes(status)) {
+    inv.paidAmount = 0
   }
 
   inv.status = status as any
