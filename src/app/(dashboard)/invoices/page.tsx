@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
-import { getInvoices, initializeStore, subscribe } from "@/lib/store/data-store"
+import { getInvoices, updateInvoiceStatus, deleteInvoice, initializeStore, subscribe } from "@/lib/store/data-store"
 import {
   formatCurrency,
   formatDate,
@@ -57,6 +57,7 @@ import {
   Copy,
   Trash2,
   ArrowUpDown,
+  CheckCircle2,
 } from "lucide-react"
 import type { Invoice, InvoiceType } from "@/types"
 
@@ -467,33 +468,51 @@ export default function InvoicesPage() {
                                 View
                               </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link
-                                href={`/invoices/${invoice.id}/edit`}
-                                className="flex items-center gap-2 cursor-pointer"
+                            <DropdownMenuSeparator />
+                            {invoice.status === "DRAFT" && (
+                              <DropdownMenuItem
+                                className="flex items-center gap-2 cursor-pointer text-indigo-600"
+                                onClick={() => { try { updateInvoiceStatus(invoice.id, "SENT") } catch {} }}
                               >
-                                <FileText className="h-4 w-4" />
-                                Edit
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-                              <Copy className="h-4 w-4" />
-                              Duplicate
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-                              <Send className="h-4 w-4" />
-                              Send
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-                              <Download className="h-4 w-4" />
-                              Download PDF
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600">
-                              <Trash2 className="h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
+                                <Send className="h-4 w-4" />
+                                Issue & Send
+                              </DropdownMenuItem>
+                            )}
+                            {(invoice.status === "SENT" || invoice.status === "OVERDUE") && (
+                              <DropdownMenuItem asChild>
+                                <Link
+                                  href={`/invoices/${invoice.id}`}
+                                  className="flex items-center gap-2 cursor-pointer text-emerald-600"
+                                >
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  Record Payment
+                                </Link>
+                              </DropdownMenuItem>
+                            )}
+                            {(invoice.status === "SENT" || invoice.status === "OVERDUE") && (
+                              <DropdownMenuItem
+                                className="flex items-center gap-2 cursor-pointer"
+                                onClick={() => { try { updateInvoiceStatus(invoice.id, "CANCELLED") } catch {} }}
+                              >
+                                Cancel Invoice
+                              </DropdownMenuItem>
+                            )}
+                            {invoice.status === "DRAFT" && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600"
+                                  onClick={() => {
+                                    if (confirm(`Delete draft ${invoice.invoiceNumber}?`)) {
+                                      try { deleteInvoice(invoice.id) } catch {}
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

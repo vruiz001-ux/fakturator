@@ -11,7 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
-import { getInvoice, getCompany, initializeStore, subscribe } from "@/lib/store/data-store"
+import { getInvoice, getCompany, updateInvoiceStatus, recordPayment, deleteInvoice, initializeStore, subscribe } from "@/lib/store/data-store"
+import { logAudit } from "@/lib/audit/audit.service"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog"
 import { formatCurrency, formatDate, getStatusColor, getStatusLabel, formatNIP } from "@/lib/formatters"
 import { EmailDeliveryPanel } from "@/components/invoices/email-delivery-panel"
 import { PAYMENT_METHODS, UNITS } from "@/lib/constants"
@@ -51,6 +57,69 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     )
   }
 
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [paymentAmount, setPaymentAmount] = useState("")
+  const [actionLoading, setActionLoading] = useState(false)
+
+  const handleStatusChange = (newStatus: string) => {
+    if (!invoice) return
+    setActionLoading(true)
+    try {
+      updateInvoiceStatus(invoice.id, newStatus)
+      logAudit({
+        action: newStatus === "SENT" ? "INVOICE_ISSUED" : newStatus === "CANCELLED" ? "INVOICE_CANCELLED" : "INVOICE_UPDATED",
+        entityType: "INVOICE",
+        entityId: invoice.id,
+        actor: "USER",
+        success: true,
+        before: { status: invoice.status },
+        after: { status: newStatus },
+      })
+    } catch (err: any) {
+      alert(err.message || "Status change failed")
+    }
+    setActionLoading(false)
+  }
+
+  const handleRecordPayment = () => {
+    if (!invoice) return
+    const amount = parseFloat(paymentAmount)
+    if (isNaN(amount) || amount <= 0) return
+    try {
+      recordPayment(invoice.id, amount)
+      logAudit({
+        action: "PAYMENT_RECORDED",
+        entityType: "PAYMENT",
+        entityId: invoice.id,
+        actor: "USER",
+        success: true,
+        details: { amount, invoiceNumber: invoice.invoiceNumber },
+      })
+      setShowPaymentDialog(false)
+      setPaymentAmount("")
+    } catch (err: any) {
+      alert(err.message || "Payment recording failed")
+    }
+  }
+
+  const handleDelete = () => {
+    if (!invoice || invoice.status !== "DRAFT") return
+    if (!confirm(`Delete draft invoice ${invoice.invoiceNumber}?`)) return
+    try {
+      deleteInvoice(invoice.id)
+      logAudit({
+        action: "INVOICE_DELETED",
+        entityType: "INVOICE",
+        entityId: invoice.id,
+        actor: "USER",
+        success: true,
+      })
+      window.location.href = "/invoices"
+    } catch (err: any) {
+      alert(err.message || "Delete failed")
+    }
+  }
+
   const statusIcon = {
     PAID: <CheckCircle2 className="h-5 w-5 text-emerald-500" />,
     SENT: <Send className="h-5 w-5 text-blue-500" />,
@@ -83,25 +152,52 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4" />
-            PDF
-          </Button>
-          <Button variant="outline" size="sm">
-            <Copy className="h-4 w-4" />
-            Duplicate
-          </Button>
+          {/* Status actions */}
           {invoice.status === "DRAFT" && (
-            <Button size="sm">
-              <Send className="h-4 w-4" />
-              Send Invoice
+            <>
+              <Button size="sm" onClick={() => handleStatusChange("SENT")} loading={actionLoading}>
+                <Send className="h-4 w-4" />
+                Issue & Send
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleDelete}>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </>
+          )}
+          {invoice.status === "SENT" && (
+            <>
+              <Button size="sm" variant="success" onClick={() => setShowPaymentDialog(true)}>
+                <CreditCard className="h-4 w-4" />
+                Record Payment
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => handleStatusChange("CANCELLED")}>
+                Cancel
+              </Button>
+            </>
+          )}
+          {invoice.status === "PARTIALLY_PAID" && (
+            <Button size="sm" variant="success" onClick={() => setShowPaymentDialog(true)}>
+              <CreditCard className="h-4 w-4" />
+              Record Payment
             </Button>
           )}
-          {(invoice.status === "SENT" || invoice.status === "OVERDUE") && (
-            <Button size="sm" variant="success">
-              <CheckCircle2 className="h-4 w-4" />
-              Mark as Paid
-            </Button>
+          {invoice.status === "OVERDUE" && (
+            <>
+              <Button size="sm" variant="success" onClick={() => setShowPaymentDialog(true)}>
+                <CreditCard className="h-4 w-4" />
+                Record Payment
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => handleStatusChange("CANCELLED")}>
+                Cancel
+              </Button>
+            </>
+          )}
+          {invoice.status === "PAID" && (
+            <Badge variant="success" className="h-8 px-3 text-sm">
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Fully Paid
+            </Badge>
           )}
         </div>
       </div>
@@ -380,6 +476,60 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           </Card>
         </div>
       </div>
+      {/* Payment Dialog */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Payment for {invoice.invoiceNumber}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg bg-slate-50 p-3 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Invoice Total</span>
+                <span className="font-semibold">{formatCurrency(invoice.total, invoice.currency)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Already Paid</span>
+                <span className="text-emerald-600">{formatCurrency(invoice.paidAmount, invoice.currency)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-medium">
+                <span className="text-slate-700">Remaining</span>
+                <span className="text-amber-600">{formatCurrency(invoice.total - invoice.paidAmount, invoice.currency)}</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Payment Amount ({invoice.currency})</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={invoice.total - invoice.paidAmount}
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                placeholder={`${(invoice.total - invoice.paidAmount).toFixed(2)}`}
+              />
+              <button
+                type="button"
+                className="text-xs text-indigo-600 hover:text-indigo-700"
+                onClick={() => setPaymentAmount((invoice.total - invoice.paidAmount).toFixed(2))}
+              >
+                Pay full remaining amount
+              </button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>Cancel</Button>
+            <Button
+              variant="success"
+              onClick={handleRecordPayment}
+              disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Record Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
