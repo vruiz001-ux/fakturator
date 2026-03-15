@@ -3,7 +3,8 @@
 import { useState } from "react"
 import {
   Upload, FileText, Users, Briefcase, CheckCircle2, AlertCircle,
-  ArrowRight, Download, Eye, RefreshCw, Table2, MapPin,
+  ArrowRight, Download, Eye, RefreshCw, Plug, ShieldCheck, XCircle,
+  CreditCard, Package,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,270 +12,369 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
 
-type ImportStep = "upload" | "mapping" | "preview" | "importing" | "complete"
+interface ImportResult {
+  clients: { total: number; imported: number; errors: string[] }
+  invoices: { total: number; imported: number; errors: string[] }
+  products: { total: number; imported: number; errors: string[] }
+  payments: { total: number; imported: number; errors: string[] }
+}
 
-const samplePreviewData = [
-  { ninjaField: "client_name", fakturatorField: "Client Name", sample: "TechVenture Sp. z o.o.", status: "mapped" },
-  { ninjaField: "client_email", fakturatorField: "Client Email", sample: "kontakt@techventure.pl", status: "mapped" },
-  { ninjaField: "client_vat_number", fakturatorField: "Client NIP", sample: "5272987654", status: "mapped" },
-  { ninjaField: "invoice_number", fakturatorField: "Invoice Number", sample: "INV-0042", status: "mapped" },
-  { ninjaField: "invoice_date", fakturatorField: "Issue Date", sample: "2026-01-15", status: "mapped" },
-  { ninjaField: "due_date", fakturatorField: "Due Date", sample: "2026-01-29", status: "mapped" },
-  { ninjaField: "amount", fakturatorField: "Net Amount", sample: "5000.00", status: "mapped" },
-  { ninjaField: "tax_rate", fakturatorField: "VAT Rate", sample: "23", status: "mapped" },
-  { ninjaField: "product_key", fakturatorField: "Service Name", sample: "Web Development", status: "mapped" },
-  { ninjaField: "custom_field_1", fakturatorField: "—", sample: "Internal ref", status: "unmapped" },
-]
-
-const migrationHistory = [
-  { id: 1, source: "Ninja Invoice", date: "2026-03-10", records: 156, imported: 152, failed: 4, status: "COMPLETED" },
-  { id: 2, source: "CSV Import", date: "2026-03-12", records: 23, imported: 23, failed: 0, status: "COMPLETED" },
-]
+interface ImportHistoryEntry {
+  id: number
+  source: string
+  date: string
+  records: number
+  imported: number
+  failed: number
+  status: string
+}
 
 export default function MigrationPage() {
-  const [step, setStep] = useState<ImportStep>("upload")
-  const [importing, setImporting] = useState(false)
+  // Connection state
+  const [apiUrl, setApiUrl] = useState("")
+  const [apiToken, setApiToken] = useState("")
+  const [testing, setTesting] = useState(false)
+  const [connected, setConnected] = useState(false)
+  const [companyName, setCompanyName] = useState("")
+  const [connectionError, setConnectionError] = useState("")
 
-  const handleStartImport = () => {
-    setImporting(true)
-    setStep("importing")
-    setTimeout(() => {
-      setStep("complete")
-      setImporting(false)
-    }, 3000)
+  // Import options
+  const [importClients, setImportClients] = useState(true)
+  const [importInvoices, setImportInvoices] = useState(true)
+  const [importProducts, setImportProducts] = useState(true)
+  const [importPayments, setImportPayments] = useState(true)
+
+  // Import state
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [importError, setImportError] = useState("")
+
+  // History
+  const [history, setHistory] = useState<ImportHistoryEntry[]>([
+    { id: 1, source: "Invoice Ninja", date: "2026-03-10", records: 156, imported: 152, failed: 4, status: "COMPLETED" },
+    { id: 2, source: "CSV Import", date: "2026-03-12", records: 23, imported: 23, failed: 0, status: "COMPLETED" },
+  ])
+
+  const handleTestConnection = async () => {
+    setTesting(true)
+    setConnectionError("")
+    setConnected(false)
+    setCompanyName("")
+
+    try {
+      const res = await fetch("/api/ninja", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "test", apiUrl, apiToken }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setConnected(true)
+        setCompanyName(data.companyName || "Connected")
+      } else {
+        setConnectionError(data.error || "Connection failed")
+      }
+    } catch (err: any) {
+      setConnectionError(err.message || "Network error")
+    } finally {
+      setTesting(false)
+    }
   }
+
+  const handleStartImport = async () => {
+    setImporting(true)
+    setImportResult(null)
+    setImportError("")
+
+    try {
+      const res = await fetch("/api/ninja", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "import",
+          apiUrl,
+          apiToken,
+          options: {
+            importClients,
+            importInvoices,
+            importProducts,
+            importPayments,
+          },
+        }),
+      })
+      const data = await res.json()
+      if (data.success && data.result) {
+        setImportResult(data.result)
+        // Add to history
+        const totalImported =
+          data.result.clients.imported +
+          data.result.invoices.imported +
+          data.result.products.imported +
+          data.result.payments.imported
+        const totalErrors =
+          data.result.clients.errors.length +
+          data.result.invoices.errors.length +
+          data.result.products.errors.length +
+          data.result.payments.errors.length
+        const totalRecords =
+          data.result.clients.total +
+          data.result.invoices.total +
+          data.result.products.total +
+          data.result.payments.total
+        setHistory((prev) => [
+          {
+            id: Date.now(),
+            source: "Invoice Ninja",
+            date: new Date().toISOString().split("T")[0],
+            records: totalRecords,
+            imported: totalImported,
+            failed: totalErrors,
+            status: "COMPLETED",
+          },
+          ...prev,
+        ])
+      } else {
+        setImportError(data.error || "Import failed")
+      }
+    } catch (err: any) {
+      setImportError(err.message || "Network error")
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const handleReset = () => {
+    setConnected(false)
+    setCompanyName("")
+    setConnectionError("")
+    setImportResult(null)
+    setImportError("")
+    setApiUrl("")
+    setApiToken("")
+  }
+
+  const totalImported = importResult
+    ? importResult.clients.imported + importResult.invoices.imported + importResult.products.imported + importResult.payments.imported
+    : 0
+  const totalErrors = importResult
+    ? importResult.clients.errors.length + importResult.invoices.errors.length + importResult.products.errors.length + importResult.payments.errors.length
+    : 0
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-slate-500">Import data from Ninja Invoice or other sources</p>
+          <p className="text-sm text-slate-500">Import data from Invoice Ninja or other sources</p>
         </div>
       </div>
 
-      <Tabs defaultValue="import" className="space-y-6">
+      <Tabs defaultValue="ninja" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="import">New Import</TabsTrigger>
+          <TabsTrigger value="ninja">Invoice Ninja Import</TabsTrigger>
           <TabsTrigger value="history">Import History</TabsTrigger>
         </TabsList>
 
-        {/* New Import */}
-        <TabsContent value="import" className="space-y-6">
-          {/* Progress Steps */}
-          <div className="flex items-center justify-center gap-2">
-            {(["upload", "mapping", "preview", "importing", "complete"] as ImportStep[]).map((s, i) => {
-              const labels = ["Upload", "Map Fields", "Preview", "Import", "Done"]
-              const icons = [Upload, MapPin, Eye, RefreshCw, CheckCircle2]
-              const Icon = icons[i]
-              const isActive = s === step
-              const isDone = ["upload", "mapping", "preview", "importing", "complete"].indexOf(step) > i
+        {/* Invoice Ninja Import */}
+        <TabsContent value="ninja" className="space-y-6">
+          {/* Step 1: Connection */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50">
+                  <Plug className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Connect to Invoice Ninja</CardTitle>
+                  <CardDescription>Enter your Invoice Ninja API credentials to connect</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">API URL</label>
+                  <Input
+                    placeholder="https://app.invoiceninja.com"
+                    value={apiUrl}
+                    onChange={(e) => setApiUrl(e.target.value)}
+                    disabled={connected || testing}
+                  />
+                  <p className="text-xs text-slate-400">Your Invoice Ninja instance URL (no trailing slash)</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">API Token</label>
+                  <Input
+                    type="password"
+                    placeholder="Your X-API-TOKEN value"
+                    value={apiToken}
+                    onChange={(e) => setApiToken(e.target.value)}
+                    disabled={connected || testing}
+                  />
+                  <p className="text-xs text-slate-400">Found in Settings &gt; Account Management &gt; API Tokens</p>
+                </div>
+              </div>
 
-              return (
-                <div key={s} className="flex items-center gap-2">
-                  {i > 0 && <div className={`h-px w-8 ${isDone ? "bg-emerald-400" : "bg-slate-200"}`} />}
-                  <div
-                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
-                      isActive
-                        ? "bg-indigo-600 text-white"
-                        : isDone
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-slate-100 text-slate-400"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">{labels[i]}</span>
+              {/* Connection status */}
+              {connected && (
+                <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-emerald-800">Connected successfully</p>
+                    <p className="text-xs text-emerald-600">Company: {companyName}</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={handleReset} className="text-emerald-600 hover:text-emerald-800">
+                    Disconnect
+                  </Button>
+                </div>
+              )}
+
+              {connectionError && (
+                <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3">
+                  <XCircle className="h-5 w-5 text-red-600" />
+                  <div>
+                    <p className="text-sm font-medium text-red-800">Connection failed</p>
+                    <p className="text-xs text-red-600">{connectionError}</p>
                   </div>
                 </div>
-              )
-            })}
-          </div>
+              )}
 
-          {/* Step: Upload */}
-          {step === "upload" && (
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card className="group cursor-pointer transition-all hover:border-indigo-200 hover:shadow-md" onClick={() => setStep("mapping")}>
-                <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 transition-colors group-hover:bg-indigo-100">
-                    <FileText className="h-8 w-8 text-indigo-600" />
+              {!connected && (
+                <Button
+                  onClick={handleTestConnection}
+                  disabled={!apiUrl || !apiToken || testing}
+                  className="gap-2"
+                >
+                  {testing ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Testing Connection...
+                    </>
+                  ) : (
+                    <>
+                      <Plug className="h-4 w-4" />
+                      Test Connection
+                    </>
+                  )}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Step 2: Import Options (shown after connection) */}
+          {connected && !importResult && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
+                    <Package className="h-5 w-5 text-amber-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Ninja Invoice Export</h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Upload your Ninja Invoice CSV or JSON export
-                    </p>
+                    <CardTitle className="text-base">Import Options</CardTitle>
+                    <CardDescription>Select what data to import from Invoice Ninja</CardDescription>
                   </div>
-                  <div className="rounded-lg border-2 border-dashed border-slate-200 p-4 w-full transition-colors group-hover:border-indigo-300">
-                    <Upload className="mx-auto h-6 w-6 text-slate-400" />
-                    <p className="mt-2 text-xs text-slate-400">
-                      Drop file here or click to browse
-                    </p>
-                  </div>
-                  <Badge variant="secondary">Recommended</Badge>
-                </CardContent>
-              </Card>
-
-              <Card className="group cursor-pointer transition-all hover:border-slate-300 hover:shadow-md" onClick={() => setStep("mapping")}>
-                <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 transition-colors group-hover:bg-slate-200">
-                    <Table2 className="h-8 w-8 text-slate-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Generic CSV / Excel</h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Import from any system using standard file formats
-                    </p>
-                  </div>
-                  <div className="rounded-lg border-2 border-dashed border-slate-200 p-4 w-full transition-colors group-hover:border-slate-300">
-                    <Upload className="mx-auto h-6 w-6 text-slate-400" />
-                    <p className="mt-2 text-xs text-slate-400">
-                      Drop file here or click to browse
-                    </p>
-                  </div>
-                  <Badge variant="outline">Custom mapping</Badge>
-                </CardContent>
-              </Card>
-
-              <Card className="md:col-span-2">
-                <CardContent className="p-6">
-                  <h4 className="font-medium text-slate-900 mb-3">What gets imported</h4>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {[
-                      { icon: Users, label: "Clients", desc: "Names, NIP, addresses, contacts" },
-                      { icon: FileText, label: "Invoices", desc: "Numbers, amounts, dates, items" },
-                      { icon: Briefcase, label: "Products / Services", desc: "Names, rates, units" },
-                    ].map((item) => (
-                      <div key={item.label} className="flex items-start gap-3 rounded-lg border border-slate-100 p-3">
-                        <item.icon className="h-5 w-5 text-indigo-500 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">{item.label}</p>
-                          <p className="text-xs text-slate-500">{item.desc}</p>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[
+                    {
+                      key: "clients",
+                      label: "Clients",
+                      desc: "Names, NIP, addresses, contacts",
+                      icon: Users,
+                      checked: importClients,
+                      onChange: setImportClients,
+                      color: "indigo",
+                    },
+                    {
+                      key: "invoices",
+                      label: "Invoices",
+                      desc: "Numbers, amounts, dates, line items, statuses",
+                      icon: FileText,
+                      checked: importInvoices,
+                      onChange: setImportInvoices,
+                      color: "emerald",
+                    },
+                    {
+                      key: "products",
+                      label: "Products / Services",
+                      desc: "Names, rates, tax rates",
+                      icon: Briefcase,
+                      checked: importProducts,
+                      onChange: setImportProducts,
+                      color: "amber",
+                    },
+                    {
+                      key: "payments",
+                      label: "Payments",
+                      desc: "Payment records linked to invoices",
+                      icon: CreditCard,
+                      checked: importPayments,
+                      onChange: setImportPayments,
+                      color: "violet",
+                    },
+                  ].map((item) => (
+                    <label
+                      key={item.key}
+                      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-all ${
+                        item.checked
+                          ? `border-${item.color}-200 bg-${item.color}-50/50`
+                          : "border-slate-200 bg-white hover:border-slate-300"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={(e) => item.onChange(e.target.checked)}
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <item.icon className="h-4 w-4 text-slate-600" />
+                          <span className="text-sm font-medium text-slate-900">{item.label}</span>
                         </div>
+                        <p className="mt-0.5 text-xs text-slate-500">{item.desc}</p>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                    </label>
+                  ))}
+                </div>
 
-          {/* Step: Mapping */}
-          {step === "mapping" && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Field Mapping</CardTitle>
-                <CardDescription>
-                  Match Ninja Invoice fields to Fakturator fields. Most fields are auto-mapped.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Source Field</TableHead>
-                      <TableHead>Fakturator Field</TableHead>
-                      <TableHead>Sample Data</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {samplePreviewData.map((row) => (
-                      <TableRow key={row.ninjaField}>
-                        <TableCell className="font-mono text-xs text-slate-600">{row.ninjaField}</TableCell>
-                        <TableCell>
-                          <Select defaultValue={row.fakturatorField === "—" ? "skip" : row.fakturatorField}>
-                            <SelectTrigger className="h-8 text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={row.fakturatorField === "—" ? "skip" : row.fakturatorField}>
-                                {row.fakturatorField === "—" ? "Skip" : row.fakturatorField}
-                              </SelectItem>
-                              <SelectItem value="skip">Skip this field</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-sm text-slate-500">{row.sample}</TableCell>
-                        <TableCell>
-                          {row.status === "mapped" ? (
-                            <Badge variant="success" className="text-xs">Mapped</Badge>
-                          ) : (
-                            <Badge variant="warning" className="text-xs">Unmapped</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <div className="mt-4 flex justify-between">
-                  <Button variant="outline" onClick={() => setStep("upload")}>Back</Button>
-                  <Button onClick={() => setStep("preview")}>
-                    Preview Import
-                    <ArrowRight className="h-4 w-4" />
+                {!importClients && importInvoices && (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <p className="text-xs text-amber-700">
+                      Invoices require clients. Clients will be imported automatically if invoices are selected.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleStartImport}
+                    disabled={importing || (!importClients && !importInvoices && !importProducts && !importPayments)}
+                    className="gap-2"
+                    size="lg"
+                  >
+                    {importing ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight className="h-4 w-4" />
+                        Start Import
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {/* Step: Preview */}
-          {step === "preview" && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Import Preview</CardTitle>
-                <CardDescription>Review what will be imported before confirming</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-lg bg-indigo-50 p-4 text-center">
-                    <p className="text-3xl font-bold text-indigo-600">42</p>
-                    <p className="text-sm text-indigo-600">Clients</p>
-                  </div>
-                  <div className="rounded-lg bg-emerald-50 p-4 text-center">
-                    <p className="text-3xl font-bold text-emerald-600">156</p>
-                    <p className="text-sm text-emerald-600">Invoices</p>
-                  </div>
-                  <div className="rounded-lg bg-amber-50 p-4 text-center">
-                    <p className="text-3xl font-bold text-amber-600">18</p>
-                    <p className="text-sm text-amber-600">Services</p>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    <span className="text-slate-700">All required fields are mapped</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    <span className="text-slate-700">NIP formats validated</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    <span className="text-slate-700">No duplicate invoice numbers detected</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <AlertCircle className="h-4 w-4 text-amber-500" />
-                    <span className="text-slate-700">1 field was skipped (custom_field_1)</span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <Button variant="outline" onClick={() => setStep("mapping")}>Back to Mapping</Button>
-                  <Button onClick={handleStartImport}>
-                    Start Import
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Step: Importing */}
-          {step === "importing" && (
+          {/* Importing spinner */}
+          {importing && (
             <Card>
               <CardContent className="flex flex-col items-center gap-6 py-16">
                 <div className="relative">
@@ -282,45 +382,102 @@ export default function MigrationPage() {
                 </div>
                 <div className="text-center">
                   <h3 className="text-xl font-semibold text-slate-900">Importing your data...</h3>
-                  <p className="mt-2 text-sm text-slate-500">This may take a moment. Please don&apos;t close this page.</p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Fetching data from Invoice Ninja and importing into Fakturator. This may take a moment.
+                  </p>
                 </div>
                 <div className="w-64">
                   <div className="h-2 rounded-full bg-slate-100">
                     <div className="h-2 rounded-full bg-indigo-600 transition-all animate-pulse" style={{ width: "65%" }} />
                   </div>
-                  <p className="mt-2 text-center text-xs text-slate-400">Processing 156 records...</p>
+                  <p className="mt-2 text-center text-xs text-slate-400">Please don&apos;t close this page</p>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {/* Step: Complete */}
-          {step === "complete" && (
+          {/* Import error */}
+          {importError && (
             <Card>
-              <CardContent className="flex flex-col items-center gap-6 py-16">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
-                  <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+              <CardContent className="flex flex-col items-center gap-4 py-12">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                  <XCircle className="h-8 w-8 text-red-600" />
                 </div>
                 <div className="text-center">
-                  <h3 className="text-xl font-semibold text-slate-900">Import Complete!</h3>
-                  <p className="mt-2 text-sm text-slate-500">Your Ninja Invoice data has been imported successfully.</p>
+                  <h3 className="text-xl font-semibold text-slate-900">Import Failed</h3>
+                  <p className="mt-2 text-sm text-red-600">{importError}</p>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-lg bg-emerald-50 p-4 text-center">
-                    <p className="text-2xl font-bold text-emerald-600">42</p>
-                    <p className="text-xs text-emerald-600">Clients imported</p>
+                <Button variant="outline" onClick={() => setImportError("")}>
+                  Try Again
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 3: Import Results */}
+          {importResult && (
+            <Card>
+              <CardContent className="space-y-6 py-8">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+                    <CheckCircle2 className="h-8 w-8 text-emerald-600" />
                   </div>
-                  <div className="rounded-lg bg-emerald-50 p-4 text-center">
-                    <p className="text-2xl font-bold text-emerald-600">152</p>
-                    <p className="text-xs text-emerald-600">Invoices imported</p>
-                  </div>
-                  <div className="rounded-lg bg-amber-50 p-4 text-center">
-                    <p className="text-2xl font-bold text-amber-600">4</p>
-                    <p className="text-xs text-amber-600">Skipped (errors)</p>
+                  <div className="text-center">
+                    <h3 className="text-xl font-semibold text-slate-900">Import Complete!</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Successfully imported {totalImported} records from Invoice Ninja
+                      {totalErrors > 0 && ` with ${totalErrors} error${totalErrors !== 1 ? "s" : ""}`}
+                    </p>
                   </div>
                 </div>
-                <div className="flex gap-3">
-                  <Button variant="outline" onClick={() => setStep("upload")}>Import More</Button>
+
+                <div className="grid gap-4 sm:grid-cols-4">
+                  {[
+                    { label: "Clients", data: importResult.clients, icon: Users, color: "indigo" },
+                    { label: "Invoices", data: importResult.invoices, icon: FileText, color: "emerald" },
+                    { label: "Products", data: importResult.products, icon: Briefcase, color: "amber" },
+                    { label: "Payments", data: importResult.payments, icon: CreditCard, color: "violet" },
+                  ].map((cat) => (
+                    <div key={cat.label} className="rounded-lg border border-slate-200 p-4 text-center">
+                      <cat.icon className="mx-auto h-5 w-5 text-slate-400 mb-2" />
+                      <p className="text-2xl font-bold text-slate-900">
+                        {cat.data.imported}
+                        <span className="text-sm font-normal text-slate-400">/{cat.data.total}</span>
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">{cat.label}</p>
+                      {cat.data.errors.length > 0 && (
+                        <p className="text-xs text-red-500 mt-1">{cat.data.errors.length} error{cat.data.errors.length !== 1 ? "s" : ""}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Error details */}
+                {totalErrors > 0 && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                    <p className="text-sm font-medium text-red-800 mb-2">Errors encountered during import:</p>
+                    <div className="max-h-40 overflow-y-auto space-y-1">
+                      {[
+                        ...importResult.clients.errors.map((e) => ({ category: "Client", error: e })),
+                        ...importResult.invoices.errors.map((e) => ({ category: "Invoice", error: e })),
+                        ...importResult.products.errors.map((e) => ({ category: "Product", error: e })),
+                        ...importResult.payments.errors.map((e) => ({ category: "Payment", error: e })),
+                      ].map((item, i) => (
+                        <div key={i} className="flex items-start gap-2 text-xs text-red-700">
+                          <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                          <span>
+                            <span className="font-medium">{item.category}:</span> {item.error}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-center gap-3">
+                  <Button variant="outline" onClick={handleReset}>
+                    Import More
+                  </Button>
                   <Button asChild>
                     <a href="/dashboard">Go to Dashboard</a>
                   </Button>
@@ -351,7 +508,7 @@ export default function MigrationPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {migrationHistory.map((row) => (
+                  {history.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell className="font-medium">{row.source}</TableCell>
                       <TableCell className="text-slate-500">{row.date}</TableCell>
