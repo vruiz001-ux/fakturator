@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { clearAllData, initializeStore as initStore } from "@/lib/store/data-store"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -44,8 +45,7 @@ export default function MigrationPage() {
   useState(() => {
     try {
       const { loadSecureToken } = require("@/lib/auth/auth.store")
-      const { getNinjaCredentials, initializeStore } = require("@/lib/store/data-store")
-      initializeStore()
+      initStore()
       const savedUrl = loadSecureToken("ninja_url")
       const savedToken = loadSecureToken("ninja_token")
       if (savedUrl) setApiUrl(savedUrl)
@@ -109,11 +109,8 @@ export default function MigrationPage() {
     setImportError("")
 
     // Clear existing data before importing to avoid stale currency issues
-    try {
-      const { clearAllData, initializeStore } = require("@/lib/store/data-store")
-      clearAllData()
-      initializeStore()
-    } catch {}
+    clearAllData()
+    initStore()
 
     try {
       // Step 1: Fetch raw data from Ninja via server-side proxy
@@ -191,6 +188,15 @@ export default function MigrationPage() {
     setImportError("")
     setApiUrl("")
     setApiToken("")
+  }
+
+  const handleClearAllData = () => {
+    if (confirm("This will delete all imported invoices, clients, and company data. Continue?")) {
+      clearAllData()
+      initStore()
+      setImportResult(null)
+      alert("All data cleared. You can now re-import from Ninja.")
+    }
   }
 
   const totalImported = importResult
@@ -576,6 +582,19 @@ export default function MigrationPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Reset data */}
+      <div className="border-t border-slate-200 pt-4 mt-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-700">Reset All Data</p>
+            <p className="text-xs text-slate-400">Clear all imported invoices, clients, and company data</p>
+          </div>
+          <Button variant="destructive" size="sm" onClick={handleClearAllData}>
+            Clear All Data
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
