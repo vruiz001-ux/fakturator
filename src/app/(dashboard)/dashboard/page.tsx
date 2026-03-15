@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useSyncExternalStore } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
   DollarSign,
@@ -139,19 +139,10 @@ export default function DashboardPage() {
     }
   }, [])
 
-  // Subscribe to store changes to trigger re-renders
-  const storeVersion = useSyncExternalStore(
-    subscribe,
-    () => {
-      // Return a snapshot that changes when store data changes
-      const inv = getInvoices()
-      const exp = getExpenses()
-      const pay = getPayments()
-      const cli = getClients()
-      return `${inv.length}-${exp.length}-${pay.length}-${cli.length}`
-    },
-    () => "0-0-0-0" // server snapshot
-  )
+  const [, forceUpdate] = useState(0)
+  useEffect(() => {
+    return subscribe(() => forceUpdate((n) => n + 1))
+  }, [])
 
   // Pull data from store
   const invoices = getInvoices()
