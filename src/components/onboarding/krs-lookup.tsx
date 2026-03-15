@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import type { KrsSearchResult, KrsCompanyRecord, CompanySourceMetadata } from "@/services/krs/krs.types"
 import type { CompanySetup, BillingSetup } from "@/lib/onboarding/onboarding.types"
+import { mapKrsToOnboarding } from "@/services/krs/krs-autofill.service"
+import { logAudit } from "@/lib/audit/audit.service"
 
 type LookupMethod = "nip" | "name" | "krs"
 
@@ -37,6 +39,8 @@ export function KrsLookup({ onCompanySelected, currentSourceMetadata, onClear }:
   const [nipValidation, setNipValidation] = useState<string | null>(null)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const queryRef = useRef(query)
+  queryRef.current = query
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -51,7 +55,7 @@ export function KrsLookup({ onCompanySelected, currentSourceMetadata, onClear }:
   // ─── NIP Lookup ──────────────────────────────────────────
 
   const handleNipLookup = useCallback(async () => {
-    const cleaned = query.replace(/[\s\-]/g, "")
+    const cleaned = queryRef.current.replace(/[\s\-]/g, "")
     if (cleaned.length !== 10) {
       setNipValidation("NIP must be exactly 10 digits")
       return
@@ -79,7 +83,7 @@ export function KrsLookup({ onCompanySelected, currentSourceMetadata, onClear }:
     } finally {
       setLoading(false)
     }
-  }, [query])
+  }, [])
 
   // ─── Name / KRS Search ──────────────────────────────────
 
@@ -152,17 +156,14 @@ export function KrsLookup({ onCompanySelected, currentSourceMetadata, onClear }:
 
   // ─── Apply company data ─────────────────────────────────
 
-  const applyCompany = async (company: KrsCompanyRecord, lookupMethod: string) => {
-    const { mapKrsToOnboarding } = await import("@/services/krs/krs-autofill.service")
+  const applyCompany = (company: KrsCompanyRecord, lookupMethod: string) => {
     const autofill = mapKrsToOnboarding(company)
 
-    // Override source metadata with lookup method
     autofill.metadata.sourceType = "KRS"
     ;(autofill.metadata as any).lookupMethod = lookupMethod
 
     onCompanySelected(autofill.company, autofill.billing, autofill.metadata, autofill.filledFields)
 
-    const { logAudit } = await import("@/lib/audit/audit.service")
     logAudit({
       action: "COMPANY_SETTINGS_UPDATED",
       entityType: "ORGANIZATION",

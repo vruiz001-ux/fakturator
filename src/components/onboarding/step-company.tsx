@@ -3,6 +3,7 @@
 import { useState } from "react"
 import type { CompanySetup, BillingSetup } from "@/lib/onboarding/onboarding.types"
 import type { CompanySourceMetadata } from "@/services/krs/krs.types"
+import { trackOverride } from "@/services/krs/krs-autofill.service"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -62,7 +63,6 @@ export function StepCompany({ data, onUpdate, errors, billingData, onUpdateBilli
   const handleFieldChange = (field: string, value: string) => {
     onUpdate({ [field]: value } as Partial<CompanySetup>)
     if (krsFields.has(field) && sourceMetadata) {
-      const { trackOverride } = require("@/services/krs/krs-autofill.service")
       onSourceMetadataChange?.(trackOverride(sourceMetadata, field))
     }
   }
