@@ -9,7 +9,21 @@ import type {
 
 // ─── Store State ──────────────────────────────────────────
 
+interface CompanyProfile {
+  name: string
+  address?: string
+  city?: string
+  postalCode?: string
+  country?: string
+  nip?: string
+  email?: string
+  phone?: string
+  bankName?: string
+  bankAccount?: string
+}
+
 interface DataStore {
+  company: CompanyProfile
   clients: Client[]
   invoices: Invoice[]
   services: Service[]
@@ -20,6 +34,7 @@ interface DataStore {
 }
 
 const store: DataStore = {
+  company: { name: "" },
   clients: [],
   invoices: [],
   services: [],
@@ -45,6 +60,11 @@ function notify() {
 
 // ─── Getters ──────────────────────────────────────────────
 
+export function getCompany(): CompanyProfile { return store.company }
+export function setCompany(data: Partial<CompanyProfile>): void {
+  store.company = { ...store.company, ...data }
+  notify()
+}
 export function getClients(): Client[] { return store.clients }
 export function getClient(id: string): Client | undefined { return store.clients.find(c => c.id === id) }
 export function getInvoices(): Invoice[] { return store.invoices }

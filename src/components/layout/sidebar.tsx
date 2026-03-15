@@ -21,6 +21,7 @@ import {
   Plug,
 } from "lucide-react"
 import { getOnboardingState, loadOnboarding, subscribe as onboardingSubscribe } from "@/lib/onboarding/onboarding.store"
+import { getCompany, subscribe as storeSubscribe } from "@/lib/store/data-store"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -45,21 +46,26 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [companyName, setCompanyName] = useState("")
 
   useEffect(() => {
-    try {
-      loadOnboarding()
-      const state = getOnboardingState()
-      if (state.status === "COMPLETED") {
-        setCompanyName(state.data.company.legalName || state.data.company.tradingName || "")
-      }
-      return onboardingSubscribe(() => {
-        try {
-          const s = getOnboardingState()
-          if (s.status === "COMPLETED") {
-            setCompanyName(s.data.company.legalName || s.data.company.tradingName || "")
-          }
-        } catch {}
-      })
-    } catch {}
+    const updateName = () => {
+      try {
+        // Check data store first (set by Ninja import)
+        const company = getCompany()
+        if (company.name) {
+          setCompanyName(company.name)
+          return
+        }
+        // Fall back to onboarding
+        loadOnboarding()
+        const s = getOnboardingState()
+        if (s.status === "COMPLETED") {
+          setCompanyName(s.data.company.legalName || s.data.company.tradingName || "")
+        }
+      } catch {}
+    }
+    updateName()
+    const unsub1 = storeSubscribe(updateName)
+    const unsub2 = onboardingSubscribe(updateName)
+    return () => { unsub1(); unsub2() }
   }, [])
 
   return (

@@ -18,7 +18,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "fetch") {
-      // Fetch raw data from Ninja — client will do the mapping and store insertion
       const opts = {
         importClients: true,
         importInvoices: true,
@@ -27,7 +26,9 @@ export async function POST(request: NextRequest) {
         ...options,
       }
 
-      const [clients, invoices, products, payments] = await Promise.all([
+      // Fetch company name + all data in parallel
+      const [connectionResult, clients, invoices, products, payments] = await Promise.all([
+        testConnection(config),
         opts.importClients ? fetchClients(config) : Promise.resolve([]),
         opts.importInvoices ? fetchInvoices(config) : Promise.resolve([]),
         opts.importProducts ? fetchProducts(config) : Promise.resolve([]),
@@ -36,7 +37,13 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: { clients, invoices, products, payments },
+        data: {
+          clients,
+          invoices,
+          products,
+          payments,
+          companyName: connectionResult.companyName || "",
+        },
       })
     }
 

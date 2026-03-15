@@ -1,6 +1,6 @@
 // Client-side import: maps Ninja data and inserts into browser data store
 import type { NinjaClient, NinjaInvoice, NinjaProduct, NinjaPayment, NinjaImportResult } from "./ninja.types"
-import { addClient, addInvoice, addService, updateInvoiceStatus, initializeStore } from "@/lib/store/data-store"
+import { addClient, addInvoice, addService, updateInvoiceStatus, initializeStore, setCompany } from "@/lib/store/data-store"
 import { logAudit } from "@/lib/audit/audit.service"
 
 const NINJA_STATUS: Record<string, string> = {
@@ -13,8 +13,14 @@ export function importNinjaDataToStore(data: {
   invoices: NinjaInvoice[]
   products: NinjaProduct[]
   payments: NinjaPayment[]
+  companyName?: string
 }): NinjaImportResult {
   initializeStore()
+
+  // Set company profile from Ninja
+  if (data.companyName) {
+    setCompany({ name: data.companyName })
+  }
 
   const result: NinjaImportResult = {
     clients: { total: data.clients.length, imported: 0, errors: [] },

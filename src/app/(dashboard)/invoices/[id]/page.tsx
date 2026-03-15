@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
-import { getInvoice, initializeStore, subscribe } from "@/lib/store/data-store"
+import { getInvoice, getCompany, initializeStore, subscribe } from "@/lib/store/data-store"
 import { formatCurrency, formatDate, getStatusColor, getStatusLabel, formatNIP } from "@/lib/formatters"
 import { EmailDeliveryPanel } from "@/components/invoices/email-delivery-panel"
 import { PAYMENT_METHODS, UNITS } from "@/lib/constants"
@@ -115,7 +115,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               {/* Invoice Header */}
               <div className="flex justify-between mb-8">
                 <div>
-                  <h3 className="text-xl font-bold text-indigo-600">Fakturator Sp. z o.o.</h3>
+                  <h3 className="text-xl font-bold text-indigo-600">{getCompany().name || "Fakturator"}</h3>
                   <p className="text-sm text-slate-500 mt-1">
                     ul. Nowy Świat 35<br />
                     00-029 Warszawa<br />
