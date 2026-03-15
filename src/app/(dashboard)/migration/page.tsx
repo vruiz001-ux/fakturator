@@ -108,6 +108,13 @@ export default function MigrationPage() {
     setImportResult(null)
     setImportError("")
 
+    // Clear existing data before importing to avoid stale currency issues
+    try {
+      const { clearAllData, initializeStore } = require("@/lib/store/data-store")
+      clearAllData()
+      initializeStore()
+    } catch {}
+
     try {
       // Step 1: Fetch raw data from Ninja via server-side proxy
       const res = await fetch("/api/ninja", {
