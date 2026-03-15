@@ -58,6 +58,7 @@ import {
   getDisplayCurrency,
   setDisplayCurrency,
   fixInvoiceCurrencies,
+  deduplicateInvoices,
   initializeStore,
   isInitialized,
   subscribe,
@@ -138,13 +139,13 @@ function EmptyChart({ message = "No data yet" }: { message?: string }) {
 // ─── Main Page ─────────────────────────────────────────────
 
 export default function DashboardPage() {
-  // Initialize store on mount + fix stale currency data
+  // Initialize store, fix currencies, deduplicate
   useEffect(() => {
     if (!isInitialized()) {
       initializeStore()
     }
-    // Fix any invoices with wrong currency — all Ninja imports are EUR
     fixInvoiceCurrencies("EUR")
+    deduplicateInvoices()
   }, [])
 
   const [, forceUpdate] = useState(0)

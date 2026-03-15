@@ -123,6 +123,40 @@ export function fixInvoiceCurrencies(correctCurrency: string = "EUR"): number {
   return fixed
 }
 
+export function deduplicateInvoices(): number {
+  const seen = new Set<string>()
+  const before = store.invoices.length
+  store.invoices = store.invoices.filter((inv) => {
+    const key = inv.invoiceNumber
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+  const removed = before - store.invoices.length
+
+  // Also deduplicate clients
+  const seenClients = new Set<string>()
+  store.clients = store.clients.filter((c) => {
+    if (seenClients.has(c.name)) return false
+    seenClients.add(c.name)
+    return true
+  })
+
+  // Also deduplicate services
+  const seenServices = new Set<string>()
+  store.services = store.services.filter((s) => {
+    if (seenServices.has(s.name)) return false
+    seenServices.add(s.name)
+    return true
+  })
+
+  if (removed > 0 || store.clients.length < before) {
+    persist()
+    notify()
+  }
+  return removed
+}
+
 // ─── Listeners ────────────────────────────────────────────
 
 type Listener = () => void
