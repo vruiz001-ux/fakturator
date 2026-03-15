@@ -48,7 +48,7 @@ export interface NinjaCompanyProfile {
   website: string
 }
 
-export async function testConnection(config: NinjaConfig): Promise<{ success: boolean; error?: string; companyName?: string; companyProfile?: NinjaCompanyProfile }> {
+export async function testConnection(config: NinjaConfig): Promise<{ success: boolean; error?: string; companyName?: string; companyCurrencyId?: string; companyProfile?: NinjaCompanyProfile }> {
   try {
     const res = await fetch(`${config.apiUrl}/api/v1/companies`, {
       headers: HEADERS(config.apiToken),
@@ -63,6 +63,7 @@ export async function testConnection(config: NinjaConfig): Promise<{ success: bo
     return {
       success: true,
       companyName: name,
+      companyCurrencyId: settings.currency_id?.toString() || "",
       companyProfile: {
         name,
         address1: settings.address1 || "",

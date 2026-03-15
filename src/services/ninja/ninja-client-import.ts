@@ -8,12 +8,23 @@ const NINJA_STATUS: Record<string, string> = {
   "4": "PAID", "5": "CANCELLED", "6": "CANCELLED",
 }
 
+// Invoice Ninja currency_id mapping (common ones)
+const NINJA_CURRENCY: Record<string, string> = {
+  "1": "USD", "2": "GBP", "3": "EUR", "4": "ZAR",
+  "5": "DKK", "6": "ILS", "7": "SEK", "8": "KES",
+  "9": "CAD", "10": "PHP", "11": "INR", "12": "AUD",
+  "13": "SGD", "14": "NOK", "15": "NZD", "16": "CHF",
+  "17": "TWD", "18": "JPY", "19": "CNY", "20": "MXN",
+  "21": "BRL", "22": "CZK", "23": "PLN",
+}
+
 export function importNinjaDataToStore(data: {
   clients: NinjaClient[]
   invoices: NinjaInvoice[]
   products: NinjaProduct[]
   payments: NinjaPayment[]
   companyName?: string
+  companyCurrencyId?: string
   companyProfile?: {
     name: string
     address1: string
@@ -164,7 +175,7 @@ export function importNinjaDataToStore(data: {
         saleDate: inv.date || undefined,
         dueDate,
         paymentMethod: "BANK_TRANSFER",
-        currency: "PLN",
+        currency: NINJA_CURRENCY[data.companyCurrencyId || ""] || "EUR",
         notes: inv.public_notes || undefined,
         items,
       })

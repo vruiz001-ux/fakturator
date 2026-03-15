@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
           products,
           payments,
           companyName: connectionResult.companyName || "",
+          companyCurrencyId: connectionResult.companyCurrencyId || "",
           companyProfile: connectionResult.companyProfile || null,
         },
       })
