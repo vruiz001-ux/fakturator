@@ -3,8 +3,8 @@
   publish = ".next"
 
 [build.environment]
-  NODE_VERSION = "20"
-  NEXT_PUBLIC_BASE_URL = "https://fakturator.netlify.app"
+  NODE_VERSION = "22"
+  NEXT_PUBLIC_BASE_URL = "https://fakturator-app.netlify.app"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

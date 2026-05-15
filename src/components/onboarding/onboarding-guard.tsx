@@ -4,12 +4,16 @@ import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { loadOnboarding, isOnboardingComplete } from "@/lib/onboarding/onboarding.store"
 
+const DEV_BYPASS = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true"
+
 export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const [ready, setReady] = useState(false)
+  const [ready, setReady] = useState(DEV_BYPASS)
 
   useEffect(() => {
+    if (DEV_BYPASS) { setReady(true); return }
+
     let shouldRedirect = false
     try {
       if (typeof window !== "undefined") {

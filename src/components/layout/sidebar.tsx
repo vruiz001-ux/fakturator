@@ -20,6 +20,9 @@ import {
   ArrowLeftRight,
   Plug,
   LogOut,
+  TrendingUp,
+  ClipboardList,
+  Repeat,
 } from "lucide-react"
 import { getOnboardingState, loadOnboarding, subscribe as onboardingSubscribe } from "@/lib/onboarding/onboarding.store"
 import { getCompany, subscribe as storeSubscribe } from "@/lib/store/data-store"
@@ -28,14 +31,17 @@ import { logout, getAuthUser, loadAuth } from "@/lib/auth/auth.store"
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Invoices", href: "/invoices", icon: FileText },
+  { name: "Quotes", href: "/quotes", icon: ClipboardList },
+  { name: "Recurring", href: "/recurring", icon: Repeat },
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Services", href: "/services", icon: Briefcase },
   { name: "Expenses", href: "/expenses", icon: Receipt },
   { name: "Reports", href: "/reports", icon: BarChart3 },
+  { name: "Forecast", href: "/forecast", icon: TrendingUp },
   { name: "Migration", href: "/migration", icon: ArrowLeftRight },
   { name: "KSeF Center", href: "/ksef", icon: Shield },
   { name: "Integrations", href: "/integrations", icon: Plug },
-  { name: "AI Assistant", href: "/ai", icon: Sparkles },
+  { name: "Assistant", href: "/ai", icon: Sparkles },
 ]
 
 interface SidebarProps {

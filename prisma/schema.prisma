@@ -143,6 +143,9 @@ model Client {
   notes                 String?
   tags                  String[]
   isActive              Boolean        @default(true)
+  // External system identity (for idempotent imports)
+  externalSource        String?        // e.g. "NINJA_INVOICE"
+  externalId            String?        // ID in the source system
   // Invoice email delivery
   invoiceEmail          String?        // primary billing email
   invoiceEmailCc        String[]       // CC recipients
@@ -156,6 +159,7 @@ model Client {
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
 
+  @@unique([organizationId, externalSource, externalId])
   @@index([organizationId])
   @@index([name])
   @@index([nip])
@@ -175,10 +179,13 @@ model Service {
   defaultVatRate Float         @default(23)
   category       String?
   isActive       Boolean       @default(true)
+  externalSource String?
+  externalId     String?
   invoiceItems   InvoiceItem[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
+  @@unique([organizationId, externalSource, externalId])
   @@index([organizationId])
   @@index([category])
 }
@@ -220,7 +227,12 @@ model Invoice {
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
+  // External system identity (for idempotent imports)
+  externalSource       String?
+  externalId           String?
+
   @@unique([organizationId, invoiceNumber])
+  @@unique([organizationId, externalSource, externalId])
   @@index([organizationId])
   @@index([clientId])
   @@index([status])
@@ -262,10 +274,13 @@ model RecurringRule {
   nextRunDate    DateTime
   isActive       Boolean            @default(true)
   templateData   Json
+  externalSource String?
+  externalId     String?
   invoices       Invoice[]
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
+  @@unique([organizationId, externalSource, externalId])
   @@index([organizationId])
   @@index([nextRunDate])
 }
@@ -273,16 +288,19 @@ model RecurringRule {
 // ─── Payment ─────────────────────────────────────────────
 
 model Payment {
-  id        String        @id @default(cuid())
-  invoiceId String
-  invoice   Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  amount    Float
-  date      DateTime      @default(now())
-  method    PaymentMethod @default(BANK_TRANSFER)
-  reference String?
-  notes     String?
-  createdAt DateTime      @default(now())
+  id             String        @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount         Float
+  date           DateTime      @default(now())
+  method         PaymentMethod @default(BANK_TRANSFER)
+  reference      String?
+  notes          String?
+  externalSource String?
+  externalId     String?
+  createdAt      DateTime      @default(now())
 
+  @@unique([invoiceId, externalSource, externalId])
   @@index([invoiceId])
   @@index([date])
 }

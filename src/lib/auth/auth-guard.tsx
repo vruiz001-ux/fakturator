@@ -5,13 +5,15 @@ import { useRouter, usePathname } from "next/navigation"
 import { loadAuth, isAuthenticated, subscribeAuth } from "./auth.store"
 
 const PUBLIC_PATHS = ["/", "/login", "/signup"]
+const DEV_BYPASS = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true"
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const [ready, setReady] = useState(false)
+  const [ready, setReady] = useState(DEV_BYPASS)
 
   useEffect(() => {
+    if (DEV_BYPASS) { setReady(true); return }
     loadAuth()
 
     const check = () => {
