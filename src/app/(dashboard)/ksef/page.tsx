@@ -1,220 +1,140 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { Shield, CheckCircle2, AlertTriangle, XCircle, Clock, FileText, Upload, Search } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import Link from "next/link"
+import { Shield, CheckCircle2, AlertTriangle, Clock, XCircle, Database } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
-import { getInvoices, initializeStore, subscribe } from "@/lib/store/data-store"
-import { formatCurrency, formatDate } from "@/lib/formatters"
+import { getActiveOrg } from "@/lib/server/active-org"
+import { getKsefOverview } from "@/lib/server/list-data"
 
-function getKsefStatusBadge(status: string) {
-  switch (status) {
-    case "ACCEPTED": return <Badge variant="success">Accepted</Badge>
-    case "SUBMITTED": return <Badge variant="warning">Submitted</Badge>
-    case "PENDING": return <Badge variant="secondary">Pending</Badge>
-    case "REJECTED": return <Badge variant="destructive">Rejected</Badge>
-    case "ERROR": return <Badge variant="destructive">Error</Badge>
-    default: return <Badge variant="secondary">{status}</Badge>
-  }
+export const dynamic = "force-dynamic"
+
+function fc(v: number, currency: string) {
+  try { return new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(v) }
+  catch { return `${currency} ${v.toFixed(2)}` }
+}
+function fd(iso: string) {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
 }
 
-export default function KsefPage() {
-  const [, forceUpdate] = useState(0)
-  useEffect(() => {
-    initializeStore()
-    return subscribe(() => forceUpdate(n => n + 1))
-  }, [])
+const KSEF_BADGE: Record<string, { label: string; cls: string }> = {
+  ACCEPTED: { label: "Accepted", cls: "bg-emerald-100 text-emerald-700" },
+  REJECTED: { label: "Rejected", cls: "bg-rose-100 text-rose-700" },
+  ERROR: { label: "Error", cls: "bg-rose-100 text-rose-700" },
+  PENDING: { label: "Pending", cls: "bg-amber-100 text-amber-700" },
+  SUBMITTED: { label: "Submitted", cls: "bg-sky-100 text-sky-700" },
+  VALIDATED: { label: "Validated", cls: "bg-indigo-100 text-indigo-700" },
+}
 
-  const invoices = getInvoices()
-
-  // Invoices that have been submitted to KSeF
-  const submittedInvoices = invoices.filter((inv) => inv.ksefReferenceId)
-  const acceptedCount = submittedInvoices.filter((inv) => inv.ksefStatus === "ACCEPTED").length
-  const pendingCount = submittedInvoices.filter((inv) => inv.ksefStatus === "SUBMITTED" || inv.ksefStatus === "PENDING").length
-  const rejectedCount = submittedInvoices.filter((inv) => inv.ksefStatus === "REJECTED" || inv.ksefStatus === "ERROR").length
-  const notSubmittedCount = invoices.filter((inv) => !inv.ksefReferenceId && (inv.status === "PAID" || inv.status === "SENT")).length
-
-  // Invoices ready for submission (paid or sent, not yet submitted)
-  const pendingInvoices = invoices.filter(
-    (inv) => (inv.status === "PAID" || inv.status === "SENT") && !inv.ksefReferenceId
-  )
-
-  if (invoices.length === 0) {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <div className="flex flex-col items-center justify-center py-16 px-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
-              <Shield className="h-6 w-6 text-slate-400" />
-            </div>
-            <h3 className="mt-4 text-sm font-medium text-slate-900">No invoices submitted to KSeF yet</h3>
-            <p className="mt-1 text-sm text-slate-500 text-center max-w-sm">
-              Create and send invoices first, then submit them to KSeF for compliance.
-            </p>
-          </div>
-        </Card>
-      </div>
-    )
-  }
+export default async function KsefPage() {
+  const org = await getActiveOrg()
+  const { rows, counts } = await getKsefOverview(org.id)
 
   return (
-    <div className="space-y-6">
-      {/* Status Overview */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500">Accepted</p>
-              <p className="text-2xl font-bold text-slate-900">{acceptedCount}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50">
-              <Clock className="h-5 w-5 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500">Pending</p>
-              <p className="text-2xl font-bold text-slate-900">{pendingCount}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50">
-              <XCircle className="h-5 w-5 text-red-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500">Rejected</p>
-              <p className="text-2xl font-bold text-slate-900">{rejectedCount}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-              <FileText className="h-5 w-5 text-slate-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500">Not Submitted</p>
-              <p className="text-2xl font-bold text-slate-900">{notSubmittedCount}</p>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-6 p-6">
+      <header>
+        <div className="flex items-center gap-2">
+          <Shield className="h-6 w-6 text-indigo-600" />
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">KSeF Center</h1>
+        </div>
+        <p className="mt-1 text-sm text-slate-600">
+          Poland's National e-Invoicing System · {org.name}
+          <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            <Database className="h-3 w-3" /> Postgres
+          </span>
+        </p>
+      </header>
+
+      {/* Status cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <Card><CardContent className="p-5">
+          <div className="flex items-center gap-2 text-slate-500"><Clock className="h-4 w-4" /><span className="text-xs">Not submitted</span></div>
+          <p className="mt-1 text-2xl font-bold">{counts.notSubmitted}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-5">
+          <div className="flex items-center gap-2 text-amber-600"><Clock className="h-4 w-4" /><span className="text-xs">In progress</span></div>
+          <p className="mt-1 text-2xl font-bold">{counts.pending}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-5">
+          <div className="flex items-center gap-2 text-emerald-600"><CheckCircle2 className="h-4 w-4" /><span className="text-xs">Accepted</span></div>
+          <p className="mt-1 text-2xl font-bold">{counts.accepted}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-5">
+          <div className="flex items-center gap-2 text-rose-600"><XCircle className="h-4 w-4" /><span className="text-xs">Rejected</span></div>
+          <p className="mt-1 text-2xl font-bold">{counts.rejected}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-5">
+          <div className="flex items-center gap-2 text-rose-600"><AlertTriangle className="h-4 w-4" /><span className="text-xs">Error</span></div>
+          <p className="mt-1 text-2xl font-bold">{counts.error}</p>
+        </CardContent></Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Submission History */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Shield className="h-5 w-5 text-indigo-600" />
-              KSeF Submission History
-            </CardTitle>
-            <CardDescription>Track the status of invoices submitted to KSeF</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {submittedInvoices.length > 0 ? (
+      {/* Info banner */}
+      <Card className="border-indigo-200 bg-indigo-50/50">
+        <CardContent className="flex items-start gap-3 p-4">
+          <Shield className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
+          <div className="text-sm text-indigo-900">
+            <p className="font-medium">KSeF mandatory from 2026</p>
+            <p className="mt-0.5 text-indigo-800">
+              Open any invoice and run the <strong>KSeF Copilot</strong> in the agent panel for a pre-submit validation,
+              rejection-probability score, and plain-Polish explainer. Production submission requires a NIP certificate (Phase 3).
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Invoice list */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Invoices</CardTitle>
+          <CardDescription>KSeF status per invoice</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>KSeF Reference</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Number</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Issued</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>KSeF status</TableHead>
+                  <TableHead>Reference</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {submittedInvoices.map((inv) => (
-                  <TableRow key={inv.id}>
-                    <TableCell className="font-medium text-indigo-600">{inv.invoiceNumber}</TableCell>
-                    <TableCell className="font-mono text-xs text-slate-500">{inv.ksefReferenceId}</TableCell>
-                    <TableCell className="text-slate-500">{inv.ksefSubmittedAt ? formatDate(inv.ksefSubmittedAt) : "--"}</TableCell>
-                    <TableCell>{getKsefStatusBadge(inv.ksefStatus || "PENDING")}</TableCell>
+                {rows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-slate-500">
+                      No invoices yet.
+                    </TableCell>
                   </TableRow>
-                ))}
+                )}
+                {rows.map(r => {
+                  const badge = r.ksefStatus ? KSEF_BADGE[r.ksefStatus] : null
+                  return (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">
+                        <Link href={`/invoices/${r.id}`} className="text-indigo-600 hover:underline">
+                          {r.invoiceNumber}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{r.clientName}</TableCell>
+                      <TableCell className="text-sm text-slate-600">{fd(r.issueDate)}</TableCell>
+                      <TableCell className="text-right font-medium">{fc(r.total, r.currency)}</TableCell>
+                      <TableCell>
+                        {badge
+                          ? <Badge className={badge.cls}>{badge.label}</Badge>
+                          : <Badge className="bg-slate-100 text-slate-600">Not submitted</Badge>}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-slate-500">
+                        {r.ksefReferenceId || "—"}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
-            ) : (
-              <p className="text-center text-sm text-slate-400 py-8">No invoices submitted to KSeF yet.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Validation Panel */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Invoice Validation</CardTitle>
-            <CardDescription>KSeF compliance checks</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center text-sm text-slate-400 py-8">
-              Select an invoice to run validation checks.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Ready for Submission */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Ready for Submission</CardTitle>
-              <CardDescription>Invoices that can be submitted to KSeF</CardDescription>
-            </div>
-            <Button disabled={pendingInvoices.length === 0}>
-              <Upload className="h-4 w-4" />
-              Submit Selected
-            </Button>
           </div>
-        </CardHeader>
-        <CardContent>
-          {pendingInvoices.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">
-                  <input type="checkbox" className="rounded border-slate-300" />
-                </TableHead>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Validation</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pendingInvoices.map((inv) => (
-                <TableRow key={inv.id}>
-                  <TableCell>
-                    <input type="checkbox" className="rounded border-slate-300" />
-                  </TableCell>
-                  <TableCell className="font-medium">{inv.invoiceNumber}</TableCell>
-                  <TableCell className="text-slate-600">{inv.client?.name}</TableCell>
-                  <TableCell className="font-medium">{formatCurrency(inv.total, inv.currency)}</TableCell>
-                  <TableCell className="text-slate-500">{formatDate(inv.issueDate)}</TableCell>
-                  <TableCell>
-                    <Badge variant="success" className="text-xs">Valid</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="outline" size="sm">Submit</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          ) : (
-            <p className="text-center text-sm text-slate-400 py-8">No invoices ready for submission.</p>
-          )}
         </CardContent>
       </Card>
     </div>

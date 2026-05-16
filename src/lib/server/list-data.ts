@@ -187,6 +187,98 @@ export interface ServiceRow {
   externalSource: string | null
 }
 
+export interface ClientDetail {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  city: string | null
+  postalCode: string | null
+  country: string
+  nip: string | null
+  contactPerson: string | null
+  notes: string | null
+  isActive: boolean
+  invoiceEmail: string | null
+  externalSource: string | null
+  createdAt: string
+  stats: {
+    invoiceCount: number
+    totalBilled: number
+    totalPaid: number
+    outstanding: number
+    overdue: number
+    averageLagDays: number | null
+  }
+  invoices: InvoiceRow[]
+}
+
+export async function getClientDetail(clientId: string, organizationId: string): Promise<ClientDetail | null> {
+  const client = await prisma.client.findFirst({
+    where: { id: clientId, organizationId },
+    select: {
+      id: true, name: true, email: true, phone: true, address: true,
+      city: true, postalCode: true, country: true, nip: true,
+      contactPerson: true, notes: true, isActive: true, invoiceEmail: true,
+      externalSource: true, createdAt: true,
+    },
+  })
+  if (!client) return null
+
+  const invoices = await prisma.invoice.findMany({
+    where: { organizationId, clientId },
+    orderBy: { issueDate: "desc" },
+    select: {
+      id: true, invoiceNumber: true, type: true, status: true,
+      issueDate: true, dueDate: true, total: true, paidAmount: true,
+      currency: true, clientId: true, externalSource: true,
+      _count: { select: { items: true } },
+      payments: { orderBy: { date: "asc" }, take: 1, select: { date: true } },
+    },
+  })
+
+  let totalBilled = 0, totalPaid = 0, overdue = 0
+  const lags: number[] = []
+  for (const inv of invoices) {
+    if (inv.type === "PROFORMA" || inv.status === "CANCELLED" || inv.status === "CORRECTED") continue
+    totalBilled += inv.total
+    totalPaid += inv.paidAmount
+    if (inv.status === "OVERDUE") overdue += Math.max(0, inv.total - inv.paidAmount)
+    if (inv.status === "PAID" && inv.payments[0]?.date) {
+      lags.push(Math.max(0, Math.floor((inv.payments[0].date.getTime() - inv.issueDate.getTime()) / 86400000)))
+    }
+  }
+
+  return {
+    ...client,
+    createdAt: client.createdAt.toISOString(),
+    stats: {
+      invoiceCount: invoices.filter(i => i.type !== "PROFORMA").length,
+      totalBilled,
+      totalPaid,
+      outstanding: Math.max(0, totalBilled - totalPaid),
+      overdue,
+      averageLagDays: lags.length > 0 ? Math.round(lags.reduce((a, b) => a + b, 0) / lags.length) : null,
+    },
+    invoices: invoices.map(r => ({
+      id: r.id,
+      invoiceNumber: r.invoiceNumber,
+      type: r.type,
+      status: r.status,
+      issueDate: r.issueDate.toISOString(),
+      dueDate: r.dueDate.toISOString(),
+      total: r.total,
+      paidAmount: r.paidAmount,
+      currency: r.currency,
+      clientId: r.clientId,
+      clientName: client.name,
+      hasItems: r._count.items,
+      externalSource: r.externalSource,
+    })),
+  }
+}
+
 export interface QuoteRow extends InvoiceRow {}
 
 export async function getQuotesList(organizationId: string): Promise<QuoteRow[]> {
@@ -216,6 +308,66 @@ export async function getQuotesList(organizationId: string): Promise<QuoteRow[]>
     hasItems: r._count.items,
     externalSource: r.externalSource,
   }))
+}
+
+export interface KsefRow {
+  id: string
+  invoiceNumber: string
+  clientName: string
+  total: number
+  currency: string
+  issueDate: string
+  ksefStatus: string | null
+  ksefReferenceId: string | null
+  ksefSubmittedAt: string | null
+}
+
+export interface KsefOverview {
+  rows: KsefRow[]
+  counts: {
+    notSubmitted: number
+    pending: number
+    accepted: number
+    rejected: number
+    error: number
+  }
+}
+
+export async function getKsefOverview(organizationId: string): Promise<KsefOverview> {
+  const invoices = await prisma.invoice.findMany({
+    where: { organizationId, type: { not: "PROFORMA" } },
+    orderBy: { issueDate: "desc" },
+    select: {
+      id: true, invoiceNumber: true, total: true, currency: true,
+      issueDate: true, ksefStatus: true, ksefReferenceId: true, ksefSubmittedAt: true,
+      client: { select: { name: true } },
+    },
+  })
+
+  const counts = { notSubmitted: 0, pending: 0, accepted: 0, rejected: 0, error: 0 }
+  for (const inv of invoices) {
+    const s = inv.ksefStatus
+    if (!s || s === "PENDING" && !inv.ksefSubmittedAt) counts.notSubmitted++
+    else if (s === "ACCEPTED") counts.accepted++
+    else if (s === "REJECTED") counts.rejected++
+    else if (s === "ERROR") counts.error++
+    else counts.pending++
+  }
+
+  return {
+    counts,
+    rows: invoices.map(inv => ({
+      id: inv.id,
+      invoiceNumber: inv.invoiceNumber,
+      clientName: inv.client?.name ?? "—",
+      total: inv.total,
+      currency: inv.currency,
+      issueDate: inv.issueDate.toISOString(),
+      ksefStatus: inv.ksefStatus,
+      ksefReferenceId: inv.ksefReferenceId,
+      ksefSubmittedAt: inv.ksefSubmittedAt?.toISOString() ?? null,
+    })),
+  }
 }
 
 export interface RecurringRow {
