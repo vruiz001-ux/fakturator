@@ -193,21 +193,10 @@ export function updateServiceEntry(id: string, data: Partial<ServiceEntry>): voi
 
 // ─── Apply to App Store ──────────────────────────────────
 
+// Legacy no-op. Onboarding data now flows into Postgres via the migration
+// importer or a dedicated onboarding server action — not the removed
+// client-side localStorage store. Kept as a stable export so the onboarding
+// page's completion handler does not need to change.
 export function applyOnboardingToApp(): void {
-  // This function applies onboarding data to the main app store
-  // Called when onboarding is completed
-  const { addClient, addService, initializeStore } = require("@/lib/store/data-store")
-  initializeStore()
-
-  // Add services from onboarding
-  for (const svc of state.data.services.services) {
-    addService({
-      name: svc.name,
-      description: svc.description,
-      defaultRate: svc.defaultRate ?? undefined,
-      defaultUnit: svc.unit,
-      defaultVatRate: svc.vatRate,
-      category: svc.category,
-    })
-  }
+  // intentionally empty
 }

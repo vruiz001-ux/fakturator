@@ -5,6 +5,7 @@
 import "server-only"
 import { prisma } from "@/lib/prisma"
 import { callAi } from "../provider"
+import { nipChecksumValid, NIP_RE } from "@/lib/nip"
 
 export type Severity = "error" | "warning" | "info"
 
@@ -27,15 +28,6 @@ export interface KsefValidationResult {
   rejectionProbability: number   // 0-1
   aiSummary: string              // plain-Polish explanation
   recommendedActions: string[]
-}
-
-const NIP_RE = /^\d{10}$/
-
-function nipChecksumValid(nip: string): boolean {
-  if (!NIP_RE.test(nip)) return false
-  const weights = [6, 5, 7, 2, 3, 4, 5, 6, 7]
-  const sum = weights.reduce((acc, w, i) => acc + w * Number(nip[i]), 0)
-  return sum % 11 === Number(nip[9])
 }
 
 export async function validateForKsef(invoiceId: string, organizationId: string): Promise<KsefValidationResult> {

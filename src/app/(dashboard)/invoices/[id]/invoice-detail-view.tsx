@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   ArrowLeft, CreditCard, CheckCircle2, Send, Trash2, FileText, Calendar,
-  Building2, Database, Clock, AlertCircle, Edit3,
+  Building2, Database, Clock, AlertCircle, Edit3, Download,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import type { InvoiceDetail } from "@/lib/server/invoice-data"
-import { markInvoicePaid, recordPayment, markInvoiceSent, cancelInvoice } from "@/lib/server/invoice-actions"
+import { markInvoicePaid, recordPayment, markInvoiceSent, cancelInvoice, createCreditNote } from "@/lib/server/invoice-actions"
 import { AgentPanel } from "./agent-panel"
 
 const STATUS_COLORS: Record<string, string> = {
@@ -43,6 +43,53 @@ export function InvoiceDetailView({ invoice }: { invoice: InvoiceDetail }) {
 
   const overdue = invoice.status !== "PAID" && invoice.status !== "CANCELLED" && invoice.daysToDue < 0
   const statusColor = STATUS_COLORS[invoice.status] || "#94a3b8"
+  const [pdfLoading, setPdfLoading] = useState(false)
+
+  async function downloadPdf() {
+    setErr(null)
+    setPdfLoading(true)
+    try {
+      const res = await fetch("/api/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoice: {
+            invoiceNumber: invoice.invoiceNumber,
+            status: invoice.status,
+            issueDate: invoice.issueDate.slice(0, 10),
+            saleDate: invoice.saleDate?.slice(0, 10),
+            dueDate: invoice.dueDate.slice(0, 10),
+            paymentMethod: invoice.paymentMethod,
+            currency: invoice.currency,
+            subtotal: invoice.subtotal,
+            vatTotal: invoice.vatTotal,
+            total: invoice.total,
+            paidAmount: invoice.paidAmount,
+            notes: invoice.notes,
+            items: invoice.items,
+            client: invoice.client,
+          },
+          company: invoice.org,
+        }),
+      })
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        setErr(e.error || "PDF generation failed")
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${invoice.invoiceNumber.replace(/\//g, "-")}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      setErr(e.message || "PDF download failed")
+    } finally {
+      setPdfLoading(false)
+    }
+  }
 
   function run(action: () => Promise<{ ok: boolean; error?: string } | { ok: true }>) {
     setErr(null)
@@ -87,6 +134,9 @@ export function InvoiceDetailView({ invoice }: { invoice: InvoiceDetail }) {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" disabled={pdfLoading} onClick={downloadPdf}>
+            <Download className="mr-1 h-4 w-4" /> {pdfLoading ? "Generating..." : "PDF"}
+          </Button>
           {invoice.status === "DRAFT" && (
             <Button size="sm" disabled={isPending} onClick={() => run(() => markInvoiceSent(invoice.id))}>
               <Send className="mr-1 h-4 w-4" /> Mark sent
@@ -109,6 +159,20 @@ export function InvoiceDetailView({ invoice }: { invoice: InvoiceDetail }) {
             <Badge style={{ backgroundColor: "#10b98122", color: "#10b981" }} className="h-8 px-3 text-sm">
               <CheckCircle2 className="mr-1 h-4 w-4" /> Fully paid
             </Badge>
+          )}
+          {invoice.type !== "PROFORMA" && invoice.type !== "CORRECTION" && invoice.status !== "CORRECTED" && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => run(async () => {
+                const r = await createCreditNote(invoice.id)
+                if (r.ok) router.push(`/invoices/${r.creditNoteId}`)
+                return r
+              })}
+            >
+              <Edit3 className="mr-1 h-4 w-4" /> Issue credit note
+            </Button>
           )}
         </div>
       </div>

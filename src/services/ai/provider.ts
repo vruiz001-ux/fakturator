@@ -4,6 +4,7 @@
 
 import "server-only"
 import { prisma } from "@/lib/prisma"
+import { redactPii } from "@/lib/pii"
 
 export type AiProvider = "anthropic" | "groq" | "fake"
 
@@ -53,21 +54,27 @@ export async function callAi(opts: AiCallOptions, ctx: AgentContext): Promise<Ai
 
   result.latencyMs = Date.now() - t0
 
-  // Persist (fire and forget; we don't want logging to block UX)
+  // Persist (fire and forget; we don't want logging to block UX).
+  // GDPR: structured PII (tax IDs, emails, phones, IBANs) is redacted from
+  // the stored prompt + response. The model still receives the full text;
+  // only the at-rest audit copy is sanitised.
   prisma.aIInteraction
     .create({
       data: {
         organizationId: ctx.organizationId,
         userId: ctx.userId || (await ensureSystemUser(ctx.organizationId)),
         type: ctx.interactionType,
-        prompt: JSON.stringify({ system: opts.system, messages: opts.messages.slice(-1) }),
-        response: result.text,
+        prompt: redactPii(
+          JSON.stringify({ system: opts.system, messages: opts.messages.slice(-1) })
+        ),
+        response: redactPii(result.text),
         metadata: {
           provider: result.provider,
           model: result.model,
           latencyMs: result.latencyMs,
           inputTokens: result.inputTokens,
           outputTokens: result.outputTokens,
+          piiRedacted: true,
         } as any,
       },
     })

@@ -68,6 +68,68 @@ export async function runNinjaImportAction(): Promise<
   }
 }
 
+export interface RollbackPreview {
+  source: string
+  clients: number
+  services: number
+  invoices: number
+  recurring: number
+  payments: number
+}
+
+// Count what a rollback would remove, without deleting anything.
+export async function previewRollbackAction(source = "NINJA_INVOICE"): Promise<RollbackPreview> {
+  const orgId = await getActiveOrgId()
+  const [clients, services, invoices, recurring, payments] = await Promise.all([
+    prisma.client.count({ where: { organizationId: orgId, externalSource: source } }),
+    prisma.service.count({ where: { organizationId: orgId, externalSource: source } }),
+    prisma.invoice.count({ where: { organizationId: orgId, externalSource: source } }),
+    prisma.recurringRule.count({ where: { organizationId: orgId, externalSource: source } }),
+    prisma.payment.count({ where: { externalSource: source, invoice: { organizationId: orgId } } }),
+  ])
+  return { source, clients, services, invoices, recurring, payments }
+}
+
+// Roll back an import batch: removes every row tagged with the given
+// externalSource for the active org. Invoice deletes cascade to items,
+// payments, reminders, and KSeF submissions via the schema.
+export async function rollbackImportAction(
+  source = "NINJA_INVOICE",
+): Promise<{ ok: true; removed: RollbackPreview } | { ok: false; error: string }> {
+  try {
+    const orgId = await getActiveOrgId()
+    const before = await previewRollbackAction(source)
+
+    await prisma.$transaction([
+      prisma.invoice.deleteMany({ where: { organizationId: orgId, externalSource: source } }),
+      prisma.recurringRule.deleteMany({ where: { organizationId: orgId, externalSource: source } }),
+      prisma.service.deleteMany({ where: { organizationId: orgId, externalSource: source } }),
+      prisma.client.deleteMany({ where: { organizationId: orgId, externalSource: source } }),
+    ])
+
+    // Mark the most recent completed import for this source as rolled back
+    const lastImport = await prisma.migrationImport.findFirst({
+      where: { organizationId: orgId, source, status: { startsWith: "COMPLETED" } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    })
+    if (lastImport) {
+      await prisma.migrationImport.update({
+        where: { id: lastImport.id },
+        data: { status: "ROLLED_BACK" },
+      })
+    }
+
+    revalidatePath("/migration")
+    revalidatePath("/dashboard")
+    revalidatePath("/invoices")
+    revalidatePath("/clients")
+    return { ok: true, removed: before }
+  } catch (err: any) {
+    return { ok: false, error: err.message || "Rollback failed" }
+  }
+}
+
 export async function testNinjaConnectionAction(): Promise<
   { ok: true; companyName: string } | { ok: false; error: string }
 > {

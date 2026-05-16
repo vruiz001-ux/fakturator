@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { getActiveOrg, getActiveOrgId } from "./active-org"
+import { computeLineItem, sumTotals } from "@/lib/invoice-math"
 
 export interface InvoiceFormData {
   clients: Array<{ id: string; name: string }>
@@ -71,10 +72,6 @@ const createSchema = z.object({
 
 export type CreateInvoiceInput = z.infer<typeof createSchema>
 
-function round2(n: number) {
-  return Math.round((n + Number.EPSILON) * 100) / 100
-}
-
 export async function createInvoice(
   input: CreateInvoiceInput,
 ): Promise<{ ok: true; invoiceId: string } | { ok: false; error: string }> {
@@ -100,26 +97,22 @@ export async function createInvoice(
     })
     if (dup) return { ok: false, error: `Invoice number ${data.invoiceNumber} already exists` }
 
-    // Compute line items + totals
+    // Compute line items + totals via the shared, unit-tested math module
     const items = data.items.map((it, i) => {
-      const netAmount = round2(it.quantity * it.unitPrice)
-      const vatAmount = it.vatRate > 0 ? round2(netAmount * (it.vatRate / 100)) : 0
-      const grossAmount = round2(netAmount + vatAmount)
+      const computed = computeLineItem({ quantity: it.quantity, unitPrice: it.unitPrice, vatRate: it.vatRate })
       return {
         description: it.description,
         quantity: it.quantity,
         unit: "SERVICE" as const,
         unitPrice: it.unitPrice,
         vatRate: it.vatRate,
-        netAmount,
-        vatAmount,
-        grossAmount,
+        netAmount: computed.netAmount,
+        vatAmount: computed.vatAmount,
+        grossAmount: computed.grossAmount,
         sortOrder: i,
       }
     })
-    const subtotal = round2(items.reduce((s, x) => s + x.netAmount, 0))
-    const vatTotal = round2(items.reduce((s, x) => s + x.vatAmount, 0))
-    const total = round2(items.reduce((s, x) => s + x.grossAmount, 0))
+    const { subtotal, vatTotal, total } = sumTotals(items)
 
     const issueDate = new Date(`${data.issueDate}T00:00:00.000Z`)
     const dueDate = new Date(`${data.dueDate}T00:00:00.000Z`)

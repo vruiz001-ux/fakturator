@@ -116,3 +116,79 @@ export async function cancelInvoice(invoiceId: string): Promise<{ ok: true } | {
     return { ok: false, error: err.message || "Action failed" }
   }
 }
+
+// Issue a credit note (faktura korygująca): a CORRECTION invoice with negated
+// line items, linked to the original via correctedInvoiceId. The original is
+// marked CORRECTED.
+export async function createCreditNote(
+  originalInvoiceId: string,
+): Promise<{ ok: true; creditNoteId: string } | { ok: false; error: string }> {
+  try {
+    const orgId = await getActiveOrgId()
+    const original = await prisma.invoice.findFirst({
+      where: { id: originalInvoiceId, organizationId: orgId },
+      include: { items: { orderBy: { sortOrder: "asc" } } },
+    })
+    if (!original) return { ok: false, error: "Invoice not found" }
+    if (original.type === "CORRECTION") return { ok: false, error: "Cannot issue a credit note for a credit note" }
+    if (original.type === "PROFORMA") return { ok: false, error: "Proforma invoices cannot be corrected" }
+
+    const creditNumber = `KOR/${original.invoiceNumber}`
+    const dup = await prisma.invoice.findFirst({
+      where: { organizationId: orgId, invoiceNumber: creditNumber },
+      select: { id: true },
+    })
+    if (dup) return { ok: false, error: `Credit note ${creditNumber} already exists` }
+
+    const negItems = original.items.map((it, i) => ({
+      description: `Correction: ${it.description}`,
+      quantity: it.quantity,
+      unit: it.unit,
+      unitPrice: -it.unitPrice,
+      vatRate: it.vatRate,
+      netAmount: -it.netAmount,
+      vatAmount: -it.vatAmount,
+      grossAmount: -it.grossAmount,
+      sortOrder: i,
+    }))
+
+    const creditNote = await prisma.$transaction(async (tx) => {
+      const cn = await tx.invoice.create({
+        data: {
+          organizationId: orgId,
+          clientId: original.clientId,
+          invoiceNumber: creditNumber,
+          type: "CORRECTION",
+          status: "DRAFT",
+          issueDate: new Date(),
+          saleDate: new Date(),
+          dueDate: new Date(),
+          paymentMethod: original.paymentMethod,
+          currency: original.currency,
+          subtotal: -original.subtotal,
+          vatTotal: -original.vatTotal,
+          total: -original.total,
+          paidAmount: 0,
+          notes: `Credit note correcting invoice ${original.invoiceNumber}`,
+          correctedInvoiceId: original.id,
+          items: { create: negItems },
+        },
+        select: { id: true },
+      })
+      await tx.invoice.update({
+        where: { id: original.id },
+        data: { status: "CORRECTED" },
+      })
+      return cn
+    })
+
+    revalidatePath("/invoices")
+    revalidatePath(`/invoices/${originalInvoiceId}`)
+    revalidatePath(`/invoices/${creditNote.id}`)
+    revalidatePath("/dashboard")
+    revalidatePath("/reports")
+    return { ok: true, creditNoteId: creditNote.id }
+  } catch (err: any) {
+    return { ok: false, error: err.message || "Credit note failed" }
+  }
+}

@@ -44,3 +44,7 @@ next-env.d.ts
 
 # Local Netlify folder
 .netlify
+
+# Local one-off scripts
+scripts/_oneshot/
+.claude/

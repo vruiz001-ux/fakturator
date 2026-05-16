@@ -9,6 +9,7 @@ const config: Config = {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
   testMatch: ["<rootDir>/src/__tests__/**/*.test.ts"],
+  modulePathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/.netlify/"],
   collectCoverageFrom: [
     "src/lib/**/*.ts",
     "src/services/**/*.ts",

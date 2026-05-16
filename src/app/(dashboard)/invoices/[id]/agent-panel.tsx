@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Sparkles, Send, Shield, AlertTriangle, CheckCircle2, Copy } from "lucide-react"
-import { draftChaseAction, validateKsefAction } from "@/services/ai/agents/actions"
+import { Sparkles, Send, Shield, AlertTriangle, CheckCircle2, Copy, MailCheck } from "lucide-react"
+import { draftChaseAction, validateKsefAction, sendChaseAction } from "@/services/ai/agents/actions"
 import type { ChaseDraft, ChaseTone, ChaseLanguage } from "@/services/ai/agents/chaser"
 import type { KsefValidationResult } from "@/services/ai/agents/ksef-copilot"
 
@@ -42,14 +42,33 @@ export function AgentPanel({ invoiceId, invoiceStatus, daysToDue }: Props) {
   // KSeF state
   const [ksefResult, setKsefResult] = useState<KsefValidationResult | null>(null)
 
+  // Chase send state
+  const [chaseSubject, setChaseSubject] = useState("")
+  const [chaseBody, setChaseBody] = useState("")
+  const [sentMsg, setSentMsg] = useState<string | null>(null)
+
   const [err, setErr] = useState<string | null>(null)
 
+  function sendChase() {
+    setErr(null); setSentMsg(null)
+    startTransition(async () => {
+      const r = await sendChaseAction(invoiceId, chaseSubject, chaseBody)
+      if (!r.ok) { setErr(r.error); return }
+      setSentMsg(r.mock
+        ? "Reminder logged (no RESEND_API_KEY — mock send). Set the key to send for real."
+        : "Reminder sent.")
+      setChaseDraft(null)
+    })
+  }
+
   function runChase() {
-    setErr(null); setChaseDraft(null)
+    setErr(null); setChaseDraft(null); setSentMsg(null)
     startTransition(async () => {
       const r = await draftChaseAction(invoiceId, chaseTone, chaseLang)
       if (!r.ok) { setErr(r.error); return }
       setChaseDraft(r.draft)
+      setChaseSubject(r.draft.subject)
+      setChaseBody(r.draft.body)
     })
   }
 
@@ -129,22 +148,32 @@ export function AgentPanel({ invoiceId, invoiceStatus, daysToDue }: Props) {
             <div className="space-y-2">
               <div>
                 <Label className="text-xs">Subject</Label>
-                <Input value={chaseDraft.subject} readOnly className="mt-1" />
+                <Input value={chaseSubject} onChange={e => setChaseSubject(e.target.value)} className="mt-1" />
               </div>
               <div>
-                <Label className="text-xs">Body</Label>
-                <Textarea value={chaseDraft.body} readOnly rows={10} className="mt-1 font-sans text-sm" />
+                <Label className="text-xs">Body (editable before sending)</Label>
+                <Textarea value={chaseBody} onChange={e => setChaseBody(e.target.value)} rows={10} className="mt-1 font-sans text-sm" />
               </div>
               <p className="text-xs text-slate-500">
                 To: {chaseDraft.recipientEmail || "(no client email on file)"} · Tone: {chaseDraft.tone} · {chaseDraft.language.toUpperCase()}
               </p>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(`${chaseDraft.subject}\n\n${chaseDraft.body}`)}>
+              {sentMsg && (
+                <p className="flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-1.5 text-xs text-emerald-700">
+                  <MailCheck className="h-3.5 w-3.5" /> {sentMsg}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(`${chaseSubject}\n\n${chaseBody}`)}>
                   <Copy className="mr-1 h-4 w-4" /> Copy
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setChaseDraft(null)}>Redraft</Button>
-                <Button size="sm" disabled title="Resend integration pending API key">
-                  <Send className="mr-1 h-4 w-4" /> Send (Phase 5C)
+                <Button size="sm" variant="outline" onClick={() => { setChaseDraft(null); setSentMsg(null) }}>Redraft</Button>
+                <Button
+                  size="sm"
+                  disabled={isPending || !chaseDraft.recipientEmail}
+                  title={chaseDraft.recipientEmail ? "Send via Resend" : "Client has no email on file"}
+                  onClick={sendChase}
+                >
+                  <Send className="mr-1 h-4 w-4" /> {isPending ? "Sending..." : "Send reminder"}
                 </Button>
               </div>
             </div>

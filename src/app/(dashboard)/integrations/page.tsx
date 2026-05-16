@@ -273,8 +273,8 @@ function ExpensifyConnect({ onDone }: { onDone: () => void }) {
       })
       const data = await res.json()
       if (data.success && data.reports) {
-        const { importExpensifyToStore } = await import("@/services/expensify/expensify-import")
-        const importResult = importExpensifyToStore(data.reports)
+        const { importExpensifyExpenses } = await import("@/services/expensify/expensify-import")
+        const importResult = await importExpensifyExpenses(data.reports)
         setResult(importResult)
       } else {
         setError(data.error || "Import failed")

@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeftRight, CheckCircle2, AlertTriangle, Loader2, Plug, Database } from "lucide-react"
-import { runNinjaImportAction, testNinjaConnectionAction, type MigrationHistoryItem } from "@/lib/server/migration-actions"
+import { ArrowLeftRight, CheckCircle2, AlertTriangle, Loader2, Plug, Database, Undo2 } from "lucide-react"
+import {
+  runNinjaImportAction, testNinjaConnectionAction, rollbackImportAction,
+  type MigrationHistoryItem,
+} from "@/lib/server/migration-actions"
 import type { ImportResult } from "@/services/ninja/ninja-importer"
 
 function fd(iso: string) {
@@ -27,6 +30,21 @@ export function MigrationView({ history }: { history: MigrationHistoryItem[] }) 
   const [conn, setConn] = useState<{ ok: boolean; msg: string } | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [rollbackMsg, setRollbackMsg] = useState<string | null>(null)
+  const [confirmRollback, setConfirmRollback] = useState(false)
+
+  function doRollback() {
+    setError(null); setRollbackMsg(null)
+    startTransition(async () => {
+      const r = await rollbackImportAction("NINJA_INVOICE")
+      if (!r.ok) { setError(r.error); return }
+      const rm = r.removed
+      setRollbackMsg(`Rolled back: ${rm.invoices} invoices, ${rm.clients} clients, ${rm.services} services, ${rm.recurring} recurring rules removed.`)
+      setConfirmRollback(false)
+      setResult(null)
+      router.refresh()
+    })
+  }
 
   function testConnection() {
     setConn(null); setError(null)
@@ -82,12 +100,31 @@ export function MigrationView({ history }: { history: MigrationHistoryItem[] }) 
               {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Database className="mr-1 h-4 w-4" />}
               {isPending ? "Importing..." : "Run import"}
             </Button>
+            {!confirmRollback ? (
+              <Button size="sm" variant="outline" onClick={() => setConfirmRollback(true)} disabled={isPending}>
+                <Undo2 className="mr-1 h-4 w-4" /> Roll back import
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5">
+                <span className="text-xs text-rose-700">Delete all Ninja-imported data?</span>
+                <Button size="sm" variant="outline" onClick={() => setConfirmRollback(false)} disabled={isPending}>Cancel</Button>
+                <Button size="sm" onClick={doRollback} disabled={isPending} className="bg-rose-600 hover:bg-rose-700">
+                  Confirm
+                </Button>
+              </div>
+            )}
           </div>
 
           {conn && (
             <div className={`flex items-center gap-2 rounded-lg p-3 text-sm ${conn.ok ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
               {conn.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
               {conn.msg}
+            </div>
+          )}
+
+          {rollbackMsg && (
+            <div className="flex items-center gap-2 rounded-lg bg-slate-100 p-3 text-sm text-slate-700">
+              <Undo2 className="h-4 w-4" /> {rollbackMsg}
             </div>
           )}
 

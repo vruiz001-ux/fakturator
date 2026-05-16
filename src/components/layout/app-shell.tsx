@@ -5,12 +5,12 @@ import { Sidebar } from "./sidebar"
 import { Header } from "./header"
 import { cn } from "@/lib/utils"
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, orgName }: { children: React.ReactNode; orgName?: string }) {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} orgName={orgName} />
       <div
         className={cn(
           "transition-all duration-300",

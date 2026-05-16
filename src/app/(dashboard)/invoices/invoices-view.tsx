@@ -74,7 +74,10 @@ export function InvoicesView({ rows }: { rows: InvoiceRow[] }) {
         </div>
         <div className="flex gap-2">
           <a href="/api/export/invoices" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-            <Download className="h-4 w-4" /> Export CSV
+            <Download className="h-4 w-4" /> CSV
+          </a>
+          <a href="/api/export/invoices-xlsx" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <Download className="h-4 w-4" /> XLSX
           </a>
           <Link href="/invoices/new" className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
             <Plus className="h-4 w-4" /> New invoice

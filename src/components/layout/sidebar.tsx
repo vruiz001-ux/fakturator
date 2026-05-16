@@ -25,7 +25,6 @@ import {
   Repeat,
 } from "lucide-react"
 import { getOnboardingState, loadOnboarding, subscribe as onboardingSubscribe } from "@/lib/onboarding/onboarding.store"
-import { getCompany, subscribe as storeSubscribe } from "@/lib/store/data-store"
 import { logout, getAuthUser, loadAuth } from "@/lib/auth/auth.store"
 
 const navigation = [
@@ -47,22 +46,18 @@ const navigation = [
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
+  orgName?: string
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, orgName }: SidebarProps) {
   const pathname = usePathname()
-  const [companyName, setCompanyName] = useState("")
+  const [companyName, setCompanyName] = useState(orgName || "")
 
   useEffect(() => {
+    if (orgName) { setCompanyName(orgName); return }
+    // Fall back to client-side onboarding state when no server org is set
     const updateName = () => {
       try {
-        // Check data store first (set by Ninja import)
-        const company = getCompany()
-        if (company.name) {
-          setCompanyName(company.name)
-          return
-        }
-        // Fall back to onboarding
         loadOnboarding()
         const s = getOnboardingState()
         if (s.status === "COMPLETED") {
@@ -71,10 +66,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       } catch {}
     }
     updateName()
-    const unsub1 = storeSubscribe(updateName)
-    const unsub2 = onboardingSubscribe(updateName)
-    return () => { unsub1(); unsub2() }
-  }, [])
+    const unsub = onboardingSubscribe(updateName)
+    return () => { unsub() }
+  }, [orgName])
 
   return (
     <aside
